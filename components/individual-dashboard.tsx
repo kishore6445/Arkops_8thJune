@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useBrand } from "@/lib/brand-context"
 import { useUser } from "@/lib/user-context"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Image from "next/image"
@@ -24,6 +25,7 @@ export function IndividualDashboard({
   currentUserId = "",
 }: IndividualDashboardProps) {
   const { currentUser, isLoading: isUserLoading } = useUser()
+  const { currentBrand } = useBrand()
   const [powerMoves, setPowerMoves] = useState<any[]>([])
   const [victoryTargets, setVictoryTargets] = useState<any[]>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -48,11 +50,21 @@ export function IndividualDashboard({
         console.log("Power moves response:", pmResult)
         console.log("Victory targets response:", vtResult)
 
-     // if user is not active (e.g. component unmounted), don't attempt to set state
         if (!isActive) return
-// if user is active set power moves and victory targets, ensuring we have arrays to avoid rendering issues
-        setPowerMoves(Array.isArray(pmResult.powerMoves) ? pmResult.powerMoves : [])
-        setVictoryTargets(Array.isArray(vtResult.targets) ? vtResult.targets : [])
+
+        const allPowerMoves = Array.isArray(pmResult.powerMoves) ? pmResult.powerMoves : []
+        const allVictoryTargets = Array.isArray(vtResult.targets) ? vtResult.targets : []
+
+        const filteredPowerMoves = currentBrand
+          ? allPowerMoves.filter((pm: any) => (pm.brandId ?? pm.brand_id) === currentBrand)
+          : allPowerMoves
+
+        const filteredVictoryTargets = currentBrand
+          ? allVictoryTargets.filter((vt: any) => (vt.brandId ?? vt.brand_id) === currentBrand)
+          : allVictoryTargets
+
+        setPowerMoves(filteredPowerMoves)
+        setVictoryTargets(filteredVictoryTargets)
       } catch {
         if (!isActive) return
         setPowerMoves([])
@@ -67,7 +79,7 @@ export function IndividualDashboard({
     return () => {
       isActive = false
     }
-  }, [])
+  }, [currentBrand])
 
 
   //This is the function that takes a powermove and retreives the owner id
@@ -252,26 +264,29 @@ console.log("trackingMap size", trackingMap.size)
   const executionPercentage = periodData.total > 0 ? Math.round((periodData.completed / periodData.total) * 100) : 0
 
   const handleCompletePowerMove = async (id: string) => {
-    let trackingPayload: { powerMoveId: string; period: TimePeriod; target: number; actual: number; completedById?: string } | null = null
+    const powerMove = powerMoves.find((pm) => pm.id === id)
+    if (!powerMove) return
+
+    const { target, actual } = getTargetActualForPeriod(powerMove, selectedPeriod)
+    if (target <= 0) return
+
+    const actualField = getActualFieldForPeriod(powerMove, selectedPeriod)
+    const nextActual = Math.min((actual || 0) + 1, target)
+
+    const trackingPayload = {
+      powerMoveId: powerMove.id,
+      period: selectedPeriod,
+      target,
+      actual: nextActual,
+      completedById: effectiveUserId || undefined,
+    }
 
     setPowerMoves((prev) =>
       prev.map((pm) => {
         if (pm.id !== id) return pm
-        const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
-        const actualField = getActualFieldForPeriod(pm, selectedPeriod)
-        const nextActual = Math.min((actual || 0) + 1, target)
-        trackingPayload = {
-          powerMoveId: pm.id,
-          period: selectedPeriod,
-          target,
-          actual: nextActual,
-          completedById: effectiveUserId || undefined,
-        }
         return { ...pm, [actualField]: nextActual }
       }),
     )
-
-    if (!trackingPayload || trackingPayload.target <= 0) return
 
     try {
       await fetch("/api/power-move-tracking", {
@@ -290,9 +305,7 @@ console.log("trackingMap size", trackingMap.size)
           }),
         })
       }
-
-    }
-    catch {
+    } catch {
       // Ignore tracking failures to avoid blocking UI
     }
   }
