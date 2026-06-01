@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { resolveInviteRedirectBase, buildInviteRedirectTo } from "@/lib/invite-redirect"
 
 type DepartmentAccess = {
   code: "M" | "A" | "S" | "T" | "E" | "R" | "Y"
@@ -59,14 +60,19 @@ export async function POST(request: Request) {
 
     const supabase = getAdminClient()
 
-    const requestOrigin = request.headers.get("origin") || new URL(request.url).origin
-    const redirectBase = siteUrl || requestOrigin
-    const redirectTo = `${redirectBase}/auth/callback`
+    const requestOrigin = request.headers.get("origin")
+    const forwardedHost = request.headers.get("x-forwarded-host")
+    const host = forwardedHost || request.headers.get("host")
+    const forwardedProto = request.headers.get("x-forwarded-proto") || request.headers.get("x-forwarded-protocol")
+    const redirectBase = resolveInviteRedirectBase(siteUrl, requestOrigin, host, forwardedProto)
+    const redirectTo = buildInviteRedirectTo(redirectBase)
 
-    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(payload.email, {
+    const inviteOptions: { data: { name: string }; redirectTo?: string } = {
       data: { name: payload.name },
       redirectTo,
-    })
+    }
+
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(payload.email, inviteOptions)
 
     if (inviteError || !inviteData?.user) {
       return NextResponse.json({ error: inviteError?.message || "Unable to create auth user." }, { status: 400 })

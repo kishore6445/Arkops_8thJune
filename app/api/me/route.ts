@@ -86,9 +86,17 @@ export async function GET(request: Request) {
       .map((row) => normalizeJoined(row.departments)?.slug)
       .filter(Boolean)
 
-    const assignments = brands.flatMap((brand) =>
-      departments.map((department) => ({ brand, department })),
-    )
+    let assignments: { brand: string | null; department: string }[] = []
+
+    if ((!brands || brands.length === 0) && departments.length > 0) {
+      // No brand assignments exist (DB cleared). Keep department visibility by
+      // returning assignments with an empty brand so UI can still show departments.
+      assignments = departments.map((department) => ({ brand: "", department }))
+    } else if (brands.length > 0 && departments.length > 0) {
+      assignments = brands.flatMap((brand) => departments.map((department) => ({ brand, department })))
+    } else {
+      assignments = []
+    }
 
     const companyBrandSlugs =
       profile.role === "company_admin" && profile.company_id

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createSupabaseServerClient, getSupabaseAccessTokenFromCookies } from "@/lib/supabase/server"
+import { buildInviteRedirectTo, resolveInviteRedirectBase } from "@/lib/invite-redirect"
 
 type SearchParams = Promise<{
 	error?: string
@@ -130,17 +131,14 @@ async function insertCompany(
 
 async function createCompanyOwnerUser(
 	supabase: ReturnType<typeof createSupabaseServerClient>,
-	companyId: string,
+	companyId: string | undefined,
 	ownerName: string,
 	ownerEmail: string,
 	redirectBase: string | null,
 ) {
 	const inviteOptions: { data: { name: string }; redirectTo?: string } = {
 		data: { name: ownerName },
-	}
-
-	if (redirectBase) {
-		inviteOptions.redirectTo = `${redirectBase.replace(/\/$/, "")}/auth/callback`
+		redirectTo: buildInviteRedirectTo(redirectBase),
 	}
 
 	const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(ownerEmail, inviteOptions)
@@ -171,7 +169,7 @@ async function createCompanyOwnerUser(
 	return { ok: true as const }
 }
 
-async function resolveInviteRedirectBase() {
+async function getInviteRedirectBase() {
 	const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
 	if (configuredSiteUrl) {
 		return configuredSiteUrl
@@ -179,18 +177,10 @@ async function resolveInviteRedirectBase() {
 
 	const requestHeaders = await headers()
 	const origin = requestHeaders.get("origin")
-	if (origin) {
-		return origin
-	}
-
 	const forwardedHost = requestHeaders.get("x-forwarded-host")
 	const host = forwardedHost || requestHeaders.get("host")
-	if (!host) {
-		return null
-	}
-
-	const protocol = requestHeaders.get("x-forwarded-proto") || "https"
-	return `${protocol}://${host}`
+	const forwardedProto = requestHeaders.get("x-forwarded-proto") || requestHeaders.get("x-forwarded-protocol")
+	return resolveInviteRedirectBase(configuredSiteUrl, origin, host, forwardedProto)
 }
 
 async function createCompanyAction(formData: FormData) {
@@ -226,7 +216,7 @@ async function createCompanyAction(formData: FormData) {
 		redirect(`/superadmin/companies/create?error=${encodeURIComponent(result.message)}`)
 	}
 
-	const inviteRedirectBase = await resolveInviteRedirectBase()
+	const inviteRedirectBase = await getInviteRedirectBase()
 	const ownerResult = await createCompanyOwnerUser(
 		supabase,
 		result.companyId,
