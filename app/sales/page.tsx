@@ -10,6 +10,8 @@ import { useDepartmentVictoryTargets } from "@/lib/use-department-victory-target
 
 export default function SalesPage() {
   const { users: departmentUsers } = useDepartmentUsers("sales")
+  //userDepartmentusers return the users assigned to sales deapetment who are assigned to current brand
+    console.log("Department Users:", departmentUsers)
   const {
     victoryTargets: departmentVictoryTargets,
     isLoading: victoryTargetsLoading,

@@ -80,6 +80,10 @@ export function MasterySidebar({ defaultCollapsed = false }: MasterySidebarProps
   }
 
   const visibleMasteryNav = useMemo(() => {
+    if (isLoading) {
+      return []
+    }
+
     const nav = !currentUser || isAdmin
       ? masteryNav
       : masteryNav.filter((item) => {
@@ -87,7 +91,7 @@ export function MasterySidebar({ defaultCollapsed = false }: MasterySidebarProps
           return allowed.has(departmentKeyMap[item.key])
         })
     return nav
-  }, [currentUser, isAdmin])
+  }, [currentUser, isAdmin, isLoading])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

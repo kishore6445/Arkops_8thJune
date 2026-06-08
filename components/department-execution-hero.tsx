@@ -88,9 +88,34 @@ export function DepartmentExecutionHero({
     return calculateDepartmentScore(victoryTargets, powerMoves)
   }, [calculatedScore, victoryTargets, powerMoves])
 
+  // Helper function to get target and actual based on selected period
+  const getTargetActualForPeriod = (pm: PowerMove, period: string) => {
+    switch (period) {
+      case "today":
+        return {
+          target: (pm as any).dailyTarget ?? pm.weeklyTarget ?? 0,
+          actual: (pm as any).dailyActual ?? 0,
+        }
+      case "this-week":
+        return { target: pm.weeklyTarget ?? 0, actual: pm.weeklyActual ?? 0 }
+      case "this-month":
+        return { target: (pm as any).monthlyTarget ?? 0, actual: (pm as any).monthlyActual ?? 0 }
+      case "this-quarter":
+        return { target: (pm as any).quarterlyTarget ?? 0, actual: (pm as any).quarterlyActual ?? 0 }
+      default:
+        return { target: pm.weeklyTarget ?? 0, actual: pm.weeklyActual ?? 0 }
+    }
+  }
+
   const powerMoveStats = useMemo(() => {
-    const getPowerMoveTarget = (pm: PowerMove) => pm.targetPerCycle ?? pm.weeklyTarget ?? 1
-    const getPowerMoveActual = (pm: PowerMove) => Math.max(pm.progress ?? 0, pm.weeklyActual ?? 0)
+    const getPowerMoveTarget = (pm: PowerMove) => {
+      const { target } = getTargetActualForPeriod(pm, selectedPeriod)
+      return target > 0 ? target : (pm.targetPerCycle ?? pm.weeklyTarget ?? 1)
+    }
+    const getPowerMoveActual = (pm: PowerMove) => {
+      const { actual } = getTargetActualForPeriod(pm, selectedPeriod)
+      return actual ?? 0
+    }
 
     const completed = powerMoves.filter((pm) => getPowerMoveActual(pm) >= getPowerMoveTarget(pm)).length
     const total = powerMoves.length
@@ -101,7 +126,7 @@ export function DepartmentExecutionHero({
       total,
       percentage,
     }
-  }, [powerMoves])
+  }, [powerMoves, selectedPeriod])
 
   const hasPowerMoveData = powerMoves.length > 0
   const hasVictoryTargetData = victoryTargets.length > 0
@@ -215,8 +240,14 @@ export function DepartmentExecutionHero({
   const StatusIcon = status.icon
 
   const teamMomentumData: TeamMomentumMember[] = useMemo(() => {
-    const getPowerMoveTarget = (pm: PowerMove) => pm.targetPerCycle ?? pm.weeklyTarget ?? 1
-    const getPowerMoveActual = (pm: PowerMove) => Math.max(pm.progress ?? 0, pm.weeklyActual ?? 0)
+    const getPowerMoveTarget = (pm: PowerMove) => {
+      const { target } = getTargetActualForPeriod(pm, selectedPeriod)
+      return target > 0 ? target : (pm.targetPerCycle ?? pm.weeklyTarget ?? 1)
+    }
+    const getPowerMoveActual = (pm: PowerMove) => {
+      const { actual } = getTargetActualForPeriod(pm, selectedPeriod)
+      return actual ?? 0
+    }
 
     return teamMembers
       .map((member) => {
@@ -254,7 +285,7 @@ export function DepartmentExecutionHero({
         if (b.score === null) return -1
         return b.score - a.score
       })
-  }, [teamMembers, powerMoves])
+  }, [teamMembers, powerMoves, selectedPeriod])
 
   const teamMomentumColumns = useMemo(() => {
     const columnCount = 2
@@ -332,7 +363,7 @@ export function DepartmentExecutionHero({
               {powerMoveStats.completed} / {powerMoveStats.total}
             </p>
             <p className='text-xs font-semibold text-stone-500 uppercase'>
-              Power Moves Completed
+              Power Moves Completed_test
             </p>
           </div>
         </div>
@@ -631,7 +662,7 @@ export function DepartmentExecutionHero({
         <div className='flex items-center justify-between mb-6'>
           <div>
             <p className='text-lg font-black uppercase tracking-wide text-stone-900'>Power Moves</p>
-            <p className='text-xs text-stone-500 mt-1 font-semibold'>Lead Measures - Recurring Actions</p>
+            <p className='text-xs text-stone-500 mt-1 font-semibold'>Lead Measures - Recurring Actions_test</p>
           </div>
           {onAddPowerMove && (
             <Button onClick={onAddPowerMove} size='sm' className='gap-1.5'>
@@ -647,9 +678,14 @@ export function DepartmentExecutionHero({
         ) : (
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
             {powerMoves.map((pm, index) => {
-              const target = pm.targetPerCycle ?? pm.weeklyTarget ?? 1
-              const actual = Math.max(pm.progress ?? 0, pm.weeklyActual ?? 0)
-              const isCompleted = actual >= target
+              const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
+              debugger;
+
+              console.log(`Power Move: ${pm.name}, Target: ${target}, Actual: ${actual}`,selectedPeriod)
+
+              const finalTarget = target > 0 ? target : (pm.targetPerCycle ?? pm.weeklyTarget ?? 1)
+              const finalActual = actual ?? 0
+              const isCompleted = finalActual >= finalTarget
               const isPrimary = index < 2
 
               const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-red-500', 'bg-cyan-500']
@@ -673,7 +709,7 @@ export function DepartmentExecutionHero({
                   </div>
 
                   <div className='flex-1 flex items-center justify-between pt-2 border-t border-stone-100'>
-                    <span className='text-xs font-semibold text-stone-600'>{actual}/{target}</span>
+                    <span className='text-xs font-semibold text-stone-600'>{finalActual}/{finalTarget}</span>
                     <Button
                       size='sm'
                       variant={isCompleted ? 'outline' : 'secondary'}

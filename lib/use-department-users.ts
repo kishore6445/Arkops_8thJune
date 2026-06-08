@@ -67,6 +67,8 @@ export function useDepartmentUsers(departmentKey: string) {
 
         const usersResult = await usersResponse.json().catch(() => ({}))
         const assignmentsResult = await assignmentsResponse.json().catch(() => ({}))
+          console.log("Users Result:", usersResult)
+        console.log("Assignments Result:", assignmentsResult)
 
         if (!usersResponse.ok) {
           throw new Error(usersResult?.error || "Unable to load users")
@@ -81,12 +83,16 @@ export function useDepartmentUsers(departmentKey: string) {
           ? (assignmentsResult.assignments as BrandAssignment[])
           : []
 
+          debugger;
+          console.log("All Assignments:", allAssignments)
+
         const assignedUserIds = new Set(
           allAssignments
             .filter((assignment) => normalizeSlug(assignment.brandId) === brandSlug)
             .map((assignment) => assignment.userId),
         )
 
+        console.log("Assigned User IDs for current brand:", assignedUserIds)
         const departmentUsers = allUsers
           .filter((user) =>
             user.departments?.some((department) => department.code === departmentCode),

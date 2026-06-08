@@ -11,9 +11,20 @@ import { useDepartmentPowerMoves } from "@/lib/use-department-power-moves"
 import { useDepartmentVictoryTargets } from "@/lib/use-department-victory-targets"
 
 export default function MarketingPage() {
+
+  // Fetch brand configuration and department-specific data
   const { brandConfig, isReady: brandReady } = useBrand()
+
+  
   const departmentData = useBrandDepartment("marketing")
+
+  console.log("Department Data:", departmentData)
+  //Fetching department users
   const { users: departmentUsers } = useDepartmentUsers("marketing")
+
+  // Fetch department-specific victory targets and power moves
+
+
   const {
     victoryTargets: departmentVictoryTargets,
     isLoading: victoryTargetsLoading,

@@ -107,7 +107,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        debugger;
+       // debugger;
         const result = await response.json()
         console.log("[UserProvider] /api/me result:", result)
         if (isActive) setCurrentUser(result?.user || null)

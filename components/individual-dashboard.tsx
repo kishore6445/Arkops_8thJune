@@ -5,8 +5,8 @@ import { Calendar, ChevronDown, Flame, CheckCircle2, AlertCircle } from "lucide-
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PowerMoveModal, type PowerMoveFormData } from "@/components/power-move-modal"
 import { cn } from "@/lib/utils"
-import { useBrand } from "@/lib/brand-context"
 import { useUser } from "@/lib/user-context"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Image from "next/image"
@@ -25,17 +25,15 @@ export function IndividualDashboard({
   currentUserId = "",
 }: IndividualDashboardProps) {
   const { currentUser, isLoading: isUserLoading } = useUser()
-  const { currentBrand } = useBrand()
   const [powerMoves, setPowerMoves] = useState<any[]>([])
   const [victoryTargets, setVictoryTargets] = useState<any[]>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isTrackingLoading, setIsTrackingLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("today")
+  const [showPowerMoveModal, setShowPowerMoveModal] = useState(false)
 
   useEffect(() => {
     let isActive = true
-
-
 
     const load = async () => {
       try {
@@ -50,21 +48,11 @@ export function IndividualDashboard({
         console.log("Power moves response:", pmResult)
         console.log("Victory targets response:", vtResult)
 
+
         if (!isActive) return
 
-        const allPowerMoves = Array.isArray(pmResult.powerMoves) ? pmResult.powerMoves : []
-        const allVictoryTargets = Array.isArray(vtResult.targets) ? vtResult.targets : []
-
-        const filteredPowerMoves = currentBrand
-          ? allPowerMoves.filter((pm: any) => (pm.brandId ?? pm.brand_id) === currentBrand)
-          : allPowerMoves
-
-        const filteredVictoryTargets = currentBrand
-          ? allVictoryTargets.filter((vt: any) => (vt.brandId ?? vt.brand_id) === currentBrand)
-          : allVictoryTargets
-
-        setPowerMoves(filteredPowerMoves)
-        setVictoryTargets(filteredVictoryTargets)
+        setPowerMoves(Array.isArray(pmResult.powerMoves) ? pmResult.powerMoves : [])
+        setVictoryTargets(Array.isArray(vtResult.targets) ? vtResult.targets : [])
       } catch {
         if (!isActive) return
         setPowerMoves([])
@@ -79,30 +67,42 @@ export function IndividualDashboard({
     return () => {
       isActive = false
     }
-  }, [currentBrand])
+  }, [])
 
-
-  //This is the function that takes a powermove and retreives the owner id
   const getPowerMoveOwnerId = (powerMove: any) => powerMove.owner_id ?? powerMove.ownerId ?? ""
-
-//Below function takes powermove from and returns the owner name
   const getPowerMoveOwnerName = (powerMove: any) => powerMove.owner ?? powerMove.ownerName ?? ""
-
-  // Similar to power moves, these functions retrieve the owner ID and name for victory targets, checking multiple field names for compatibility and defaulting to empty strings if not found.
 
   const getVictoryTargetOwnerId = (target: any) => target.owner_id ?? target.ownerId ?? ""
   const getVictoryTargetOwnerName = (target: any) => target.owner ?? target.ownerName ?? ""
 
-  // Determine the effective user ID and name to use for filtering power moves and victory targets. If the currentUser from context is available, use its ID and name; otherwise, fall back to the props passed into the component. This ensures that we have consistent identifiers for filtering even if the user data is not fully loaded.
+  const handleSavePowerMove = async (data: PowerMoveFormData) => {
+    setPowerMoves((prev) => [
+      {
+        id: `temp-${Date.now()}`,
+        title: data.title,
+        name: data.title,
+        frequency: data.frequency,
+        targetPerCycle: data.targetPerCycle,
+        progress: 0,
+        owner: data.owner,
+        ownerId: data.ownerId,
+        weeklyTarget: data.targetPerCycle,
+        weeklyActual: 0,
+        dailyActual: 0,
+        monthlyActual: 0,
+        quarterlyActual: 0,
+        activityCompleted: false,
+        linkedVictoryTarget: data.linkedVictoryTargets[0] ?? undefined,
+      },
+      ...prev,
+    ])
+  }
+
   const effectiveUserId = currentUser?.id || currentUserId
   const effectiveUserName = currentUser?.name || currentUserName
 
-
   const displayName = currentUser?.name || currentUserName || "—"
   const displayRole = currentUser?.role || (isAdmin ? "Admin" : "Member")
-  
-  console.log("Current User:", currentUser)
-
   const displayBrands = currentUser?.assignments
     ? new Set(currentUser.assignments.map((assignment) => assignment.brand)).size
     : 0
@@ -195,7 +195,6 @@ export function IndividualDashboard({
     let isActive = true
 
     setIsTrackingLoading(true)
-    // Load tracking data for the current set of power moves and selected time period. This will update the power moves with their actual and target values for the period, allowing the dashboard to display progress. The use of AbortController allows us to cancel the fetch request if the component unmounts or if the dependencies change before the request completes, preventing potential memory leaks or state updates on unmounted components.
 
     const loadTracking = async () => {
       try {
@@ -207,18 +206,12 @@ export function IndividualDashboard({
         )
         const result = await response.json().catch(() => ({}))
 
-        debugger;
-
         if (!response.ok || !Array.isArray(result.tracking)) return
 
         const trackingMap = new Map<string, { actual: number; target: number }>(
           result.tracking.map((row: any) => [row.power_move_id, row]),
         )
 
-console.log("result.tracking", result.tracking)
-console.log("trackingMap as array", Array.from(trackingMap.entries()))
-console.log("trackingMap size", trackingMap.size)
-       
         setPowerMoves((prev) =>
           prev.map((pm) => {
             const tracked = trackingMap.get(pm.id)
@@ -264,29 +257,27 @@ console.log("trackingMap size", trackingMap.size)
   const executionPercentage = periodData.total > 0 ? Math.round((periodData.completed / periodData.total) * 100) : 0
 
   const handleCompletePowerMove = async (id: string) => {
-    const powerMove = powerMoves.find((pm) => pm.id === id)
-    if (!powerMove) return
-
-    const { target, actual } = getTargetActualForPeriod(powerMove, selectedPeriod)
-    if (target <= 0) return
-
-    const actualField = getActualFieldForPeriod(powerMove, selectedPeriod)
-    const nextActual = Math.min((actual || 0) + 1, target)
-
-    const trackingPayload = {
-      powerMoveId: powerMove.id,
-      period: selectedPeriod,
-      target,
-      actual: nextActual,
-      completedById: effectiveUserId || undefined,
-    }
+    debugger;
+    let trackingPayload: { powerMoveId: string; period: TimePeriod; target: number; actual: number; completedById?: string } | null = null
 
     setPowerMoves((prev) =>
       prev.map((pm) => {
         if (pm.id !== id) return pm
+        const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
+        const actualField = getActualFieldForPeriod(pm, selectedPeriod)
+        const nextActual = Math.min((actual || 0) + 1, target)
+        trackingPayload = {
+          powerMoveId: pm.id,
+          period: selectedPeriod,
+          target,
+          actual: nextActual,
+          completedById: effectiveUserId || undefined,
+        }
         return { ...pm, [actualField]: nextActual }
       }),
     )
+
+    if (!trackingPayload || trackingPayload.target <= 0) return
 
     try {
       await fetch("/api/power-move-tracking", {
@@ -330,6 +321,11 @@ console.log("trackingMap size", trackingMap.size)
   }
 
   const executionStatus = getExecutionStatus()
+
+  console.log("powerMoves", powerMoves)
+console.log("myPowerMoves", myPowerMoves)
+console.log("periodData", periodData)
+console.log("executionPercentage", executionPercentage)
 
   const completedPowerMoves = myPowerMoves.filter((pm) => {
     const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
@@ -606,6 +602,9 @@ console.log("trackingMap size", trackingMap.size)
             <p className='text-sm font-semibold text-stone-600'>
               {myPowerMoves.length} active
             </p>
+            <Button size='sm' className='gap-1.5' onClick={() => setShowPowerMoveModal(true)}>
+              <span>Add Power Move</span>
+            </Button>
           </div>
         </div>
 
@@ -689,6 +688,12 @@ console.log("trackingMap size", trackingMap.size)
         )}
       </div>
 
+      <PowerMoveModal
+        open={showPowerMoveModal}
+        onOpenChange={setShowPowerMoveModal}
+        onSave={handleSavePowerMove}
+        victoryTargets={victoryTargets}
+      />
     </section>
   )
 }

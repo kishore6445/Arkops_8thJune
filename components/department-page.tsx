@@ -21,7 +21,7 @@ import { getCurrentQuarter } from "@/lib/brand-structure"
 import type { QuarterOption } from "@/components/quarter-selector"
 import { useBrand } from "@/lib/brand-context"
 
-export interface VictoryTarget {
+export interface VictoryTarget { 
   id: string
   title: string
   target: number
@@ -103,6 +103,9 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
   const { toast } = useToast()
   const { mode } = useAppMode()
 
+  console.log("Current Brand:", currentBrand);
+  console.log("Department config:", config)
+
   const safeConfig = {
     ...config,
     commitments: config.commitments ?? [],
@@ -122,10 +125,8 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
   const [showWeeklyReview, setShowWeeklyReview] = useState(false)
   const [filterByMe, setFilterByMe] = useState(false)
   const [isTrackingLoading, setIsTrackingLoading] = useState(true)
-
   const currentUser = "Sarah M." // TODO: Replace with auth context
-  // const [powerMoves, setPowerMoves] = useState<PowerMove[]>(safeConfig.powerMoves)
-  const [powerMoves, setPowerMoves] = useState<PowerMove[]>([])
+  const [powerMoves, setPowerMoves] = useState<PowerMove[]>(safeConfig.powerMoves)
   const [selectedPeriod, setSelectedPeriod] = useState("this-week")
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterOption>(getCurrentQuarter())
 
@@ -135,7 +136,7 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
     const monday = new Date(today)
 
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-    monday.setHours(0, 0, 0, 0)
+    monday.setHours(0, 0, 0, 0) 
 
     return monday
   })
@@ -146,26 +147,16 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
   // }, [safeConfig.powerMoves])
 
   useEffect(() => {
-  setPowerMoves((prev) => {
-    if (!prev || prev.length === 0) {
-      return safeConfig.powerMoves
-    }
-
-    const prevIds = prev.map((pm) => pm.id).join(",")
-    const incomingIds = safeConfig.powerMoves.map((pm) => pm.id).join(",")
-
-    if (prevIds !== incomingIds) {
-      return safeConfig.powerMoves
-    }
-
-    return prev
-  })
-}, [safeConfig.powerMoves])
+    setPowerMoves(safeConfig.powerMoves)
+  }, [safeConfig.powerMoves])
 
   const powerMoveIds = useMemo(
     () => powerMoves.map((pm) => pm.id).filter(Boolean).join(","),
     [powerMoves],
   )
+
+  //debugger;
+  console.log("Power Move IDs for tracking:", powerMoveIds);
 
   const refreshPowerMoveTracking = async () => {
     // if (!powerMoveIds) return
@@ -186,8 +177,8 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
 
       if (!response.ok || !Array.isArray(result.tracking)) return
 
-      const trackingMap = new Map(
-        result.tracking.map((row: any) => [row.power_move_id, row]),
+      const trackingMap = new Map<string, { actual: number; target: number }>(
+        result.tracking.map((row: any) => [row.power_move_id as string, { actual: row.actual ?? 0, target: row.target ?? 0 }]),
       )
 
       setPowerMoves((prev) =>
@@ -196,16 +187,39 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
 
           if (!tracked) return pm
 
-          const actual = tracked.actual ?? 0
+          const actual = tracked.actual
           const target = tracked.target ?? pm.targetPerCycle ?? pm.weeklyTarget ?? 1
+
+          // Map tracking data to the correct period-specific fields
+          const updates: any = {
+            progress: actual,
+            activityCompleted: actual >= target,
+          }
+
+          switch (selectedPeriod) {
+            case "today":
+              updates.dailyActual = actual
+              updates.dailyTarget = target
+              break
+            case "this-month":
+              updates.monthlyActual = actual
+              updates.monthlyTarget = target
+              break
+            case "this-quarter":
+              updates.quarterlyActual = actual
+              updates.quarterlyTarget = target
+              break
+            case "this-week":
+            default:
+              updates.weeklyActual = actual
+              updates.weeklyTarget = target
+              break
+          }
 
           return {
             ...pm,
-            progress: actual,
-            weeklyActual: actual,
+            ...updates,
             targetPerCycle: target,
-            weeklyTarget: target,
-            activityCompleted: actual >= target,
           }
         }),
       )
@@ -281,6 +295,13 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
   const filteredPowerMoves = filterByMe
     ? powerMoves.filter((pm) => pm.owner === currentUser)
     : powerMoves
+
+  const wigPowerMoves = filteredPowerMoves.map((pm) => ({
+    id: pm.id,
+    name: pm.name,
+    weeklyTarget: pm.weeklyTarget ?? pm.targetPerCycle ?? 0,
+    weeklyActual: pm.weeklyActual ?? pm.progress ?? 0,
+  }))
 
   const teamMembers = (config.users ?? []).map((user) => ({
     name: user.name,
@@ -392,7 +413,7 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
             <UnifiedWIGSession
               departmentName={config.name}
               previousWeekCommitments={safeCommitments}
-              powerMoves={filteredPowerMoves}
+              powerMoves={wigPowerMoves}
             />
           </div>
         </div>
@@ -411,7 +432,7 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
 
             <WeeklyReviewSession
               departmentName={config.name}
-              powerMoves={filteredPowerMoves}
+              powerMoves={wigPowerMoves}
               tasks={safeTasks}
               commitments={safeCommitments}
             />
@@ -452,7 +473,7 @@ export function DepartmentPage({ config, departmentKey }: DepartmentPageProps) {
       <VictoryTargetModal
         open={showVictoryModal}
         onOpenChange={setShowVictoryModal}
-        onSuccess={() => setShowVictoryModal(false)}
+        onSave={() => setShowVictoryModal(false)}
         addAnother={addAnotherVictory}
         setAddAnother={setAddAnotherVictory}
       />

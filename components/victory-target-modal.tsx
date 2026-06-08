@@ -22,6 +22,9 @@ interface VictoryTargetModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (data: VictoryTargetFormData) => void
+  onSuccess?: () => void
+  addAnother?: boolean
+  setAddAnother?: (value: boolean) => void
 }
 
 export interface VictoryTargetFormData {
@@ -134,8 +137,14 @@ export function VictoryTargetModal({ open, onOpenChange, onSave }: VictoryTarget
         })
         setErrors({})
         setHasChanges(false)
+        if (setAddAnother) {
+          setAddAnother(true)
+        }
       } else {
         onOpenChange(false)
+        if (onSuccess) {
+          onSuccess()
+        }
       }
     } catch (error) {
       toast({

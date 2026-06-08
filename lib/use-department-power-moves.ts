@@ -36,14 +36,25 @@ export function useDepartmentPowerMoves(department: DepartmentCode): UseDepartme
   useEffect(() => {
     let isActive = true
 
+   // debugger;
+
+
+    console.log("Loading power moves for brand:", currentBrand, "and department:", department)
+    if (!currentBrand) {
+      setPowerMoves([])
+      setError(null)
+      setIsLoading(false)
+      return () => {
+        isActive = false
+      }
+    }
+
     const load = async () => {
       setIsLoading(true)
       setError(null)
 
       try {
-      const response = await fetch("/api/admin/power-moves", { cache: "force-cache" })
-      //debugger;
-      console.log('response:', response);
+        const response = await fetch("/api/admin/power-moves", { cache: "no-store" })
         const result = await response.json().catch(() => ({}))
 
         if (!response.ok) {
@@ -69,15 +80,15 @@ export function useDepartmentPowerMoves(department: DepartmentCode): UseDepartme
           const [weeklyResponse, dailyResponse, monthlyResponse] = await Promise.all([
             fetch(
               `/api/power-move-tracking?period=this-week&powerMoveIds=${encodeURIComponent(ids.join(","))}`,
-              { cache: "force-cache" },
+              { cache: "no-store" },
             ),
             fetch(
               `/api/power-move-tracking?period=today&powerMoveIds=${encodeURIComponent(ids.join(","))}`,
-              { cache: "force-cache" },
+              { cache: "no-store" },
             ),
             fetch(
               `/api/power-move-tracking?period=this-month&powerMoveIds=${encodeURIComponent(ids.join(","))}`,
-              { cache: "force-cache" },
+              { cache: "no-store" },
             ),
           ])
 
