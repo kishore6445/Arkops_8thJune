@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { isPreviewMode, isPreviewModeToken } from "@/lib/preview-mode"
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing access token." }, { status: 400 })
     }
 
+    // For preview mode tokens, just set the cookie without validation
+    if (isPreviewMode() && isPreviewModeToken(token)) {
+      const response = NextResponse.json({ ok: true })
+      response.cookies.set({
+        name: "app_access_token",
+        value: token,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      })
+      return response
+    }
+
+    // Real Supabase validation
     const supabase = createSupabaseServerClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase not configured." }, { status: 500 })
+    }
+
     const { data, error } = await supabase.auth.getUser(token)
 
     if (error || !data?.user) {

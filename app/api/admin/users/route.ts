@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveInviteRedirectBase, buildInviteRedirectTo } from "@/lib/invite-redirect"
 
 type DepartmentAccess = {
@@ -32,18 +32,8 @@ const DEPARTMENT_SEED: Record<DepartmentAccess["code"], { slug: string; name: st
   Y: { slug: "leadership", name: "Leadership", is_restricted: true },
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
-function getAdminClient() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase service role credentials")
-  }
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
 
 export async function POST(request: Request) {
   try {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { isPreviewMode, isPreviewModeToken, extractPreviewModeUserId, PREVIEW_MODE_USER_ID } from "@/lib/preview-mode"
 
 function resolveRedirectFromRole(role: unknown) {
   const normalizedRole =
@@ -32,7 +33,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing access token." }, { status: 400 })
     }
 
+    // For preview mode, just redirect to dashboard (super_admin role)
+    if (isPreviewMode() && isPreviewModeToken(token)) {
+      const userId = extractPreviewModeUserId(token)
+      if (userId === PREVIEW_MODE_USER_ID) {
+        return NextResponse.json({ redirectTo: "/superadmin", role: "super_admin" }, { status: 200 })
+      }
+      return NextResponse.json({ error: "Invalid preview token." }, { status: 401 })
+    }
+
     const supabase = createSupabaseServerClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase not configured." }, { status: 500 })
+    }
+
     const { data: authUserData, error: authUserError } = await supabase.auth.getUser(token)
 
     if (authUserError || !authUserData?.user) {

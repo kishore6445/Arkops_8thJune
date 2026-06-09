@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-function getAdminClient() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase service role credentials")
-  }
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
+import { getAdminClient } from "@/lib/supabase/admin"
+import { isPreviewMode, isPreviewModeToken, extractPreviewModeUserId, PREVIEW_MODE_USER_ID } from "@/lib/preview-mode"
 
 function normalizeJoined<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value
@@ -32,6 +21,24 @@ async function getCompanyBrandSlugs(supabase: ReturnType<typeof getAdminClient>,
     .filter((slug): slug is string => Boolean(slug))
 }
 
+// Mock user data for preview mode
+function getPreviewModeUser() {
+  return {
+    id: PREVIEW_MODE_USER_ID,
+    name: "Preview User",
+    email: "kishore6445@gmail.com",
+    avatar_url: undefined,
+    role: "super_admin",
+    company_id: null,
+    assignments: [
+      { brand: "warrior-systems", department: "leadership" },
+      { brand: "story-marketing", department: "leadership" },
+      { brand: "meta-gurukul", department: "accounts" },
+    ],
+    company_brand_slugs: [],
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization") || ""
@@ -41,7 +48,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing access token." }, { status: 401 })
     }
 
+    // Check for preview mode token
+    if (isPreviewMode() && isPreviewModeToken(token)) {
+      const userId = extractPreviewModeUserId(token)
+      if (userId === PREVIEW_MODE_USER_ID) {
+        return NextResponse.json({ user: getPreviewModeUser() }, { status: 200 })
+      }
+      return NextResponse.json({ error: "Invalid preview token." }, { status: 401 })
+    }
+
+    // Real Supabase auth
     const supabase = getAdminClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase not configured." }, { status: 500 })
+    }
 
     const { data: userData, error: userError } = await supabase.auth.getUser(token)
     if (userError || !userData?.user) {

@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { Brand, Department } from "./brand-structure"
 import { supabase } from "@/lib/supabase/browserclient"
+import { isPreviewMode } from "@/lib/preview-mode"
 
 export type UserRole = "super_admin" | "company_admin" | "member" | "viewer" | "admin"
 
@@ -120,6 +121,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
 
     loadUser()
+
+    // In preview mode, don't set up auth state listener (supabase.auth may not work)
+    if (isPreviewMode()) {
+      return () => {
+        isActive = false
+      }
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (!isActive) return

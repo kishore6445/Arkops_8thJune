@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isPreviewMode, createPreviewModeSession } from "@/lib/preview-mode"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -9,7 +10,10 @@ type SignInPayload = {
 }
 
 export async function POST(request: Request) {
-  if (!supabaseUrl || !supabaseAnonKey) {
+  // Check if we're in preview mode (Supabase env vars missing)
+  const inPreviewMode = isPreviewMode()
+
+  if (!inPreviewMode && (!supabaseUrl || !supabaseAnonKey)) {
     return NextResponse.json({ error: "Supabase auth is not configured." }, { status: 500 })
   }
 
@@ -26,6 +30,21 @@ export async function POST(request: Request) {
 
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 })
+  }
+
+  // Preview mode: create a mock session
+  if (inPreviewMode) {
+    const session = createPreviewModeSession(email)
+    if (!session) {
+      return NextResponse.json(
+        { error: `In preview mode, use email: ${email}` },
+        { status: 401 },
+      )
+    }
+    return NextResponse.json(
+      { accessToken: session.access_token, session },
+      { status: 200 },
+    )
   }
 
   const controller = new AbortController()

@@ -1,18 +1,8 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { getSupabaseAccessTokenFromCookies } from "@/lib/supabase/server"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-function getAdminClient() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase service role credentials")
-  }
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
 
 /**
  * GET /api/admin/company-brands

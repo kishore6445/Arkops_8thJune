@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/browserclient"
+import { isPreviewMode, PREVIEW_MODE_EMAIL } from "@/lib/preview-mode"
 
 export default function SignInPage() {
   const searchParams = useSearchParams()
@@ -12,8 +13,14 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const inPreviewMode = isPreviewMode()
 
   useEffect(() => {
+    // In preview mode, prefill the email
+    if (inPreviewMode) {
+      setEmail(PREVIEW_MODE_EMAIL)
+    }
+
     const inviteStatus = searchParams.get("invite")
     const errorParam = searchParams.get("error")
     if (errorParam) {
@@ -25,7 +32,7 @@ export default function SignInPage() {
       setSuccessMessage("Your account is activated. Please sign in to continue.")
       setErrorMessage(null)
     }
-  }, [searchParams])
+  }, [searchParams, inPreviewMode])
 
   // now returns the raw session object along with access token
   const signInViaServer = async (): Promise<{ accessToken: string; session: any }> => {
@@ -181,6 +188,13 @@ export default function SignInPage() {
                 className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-white/30 focus:outline-none"
               />
             </div>
+            {inPreviewMode && (
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3">
+                <p className="text-xs text-blue-300">
+                  Preview mode: Use any password to sign in with the prefilled email.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between text-xs text-slate-400">
               <label className="flex items-center gap-2">
                 <input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-slate-950" />

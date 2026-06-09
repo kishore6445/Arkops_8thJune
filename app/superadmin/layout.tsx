@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { createSupabaseServerClient, getSupabaseAccessTokenFromCookies } from "@/lib/supabase/server"
+import { isPreviewMode, isPreviewModeToken } from "@/lib/preview-mode"
 import { SuperAdminLogoutButton } from "@/components/superadmin-logout-button"
 
 const navItems = [
@@ -66,14 +67,66 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
 	const accessToken = await getSupabaseAccessTokenFromCookies()
 
 	if (!accessToken) {
-		redirect("/dashboard")
+		redirect("/signin")
+	}
+
+	// In preview mode, skip profile checks and allow access with preview token
+	if (isPreviewMode() && isPreviewModeToken(accessToken)) {
+		const adminEmail = "kishore6445@gmail.com"
+
+		return (
+			<div className="min-h-screen bg-slate-50">
+				<div className="flex min-h-screen">
+					<aside className="hidden w-64 border-r border-slate-200 md:block">
+						<SuperAdminSidebar />
+					</aside>
+
+					<div className="flex min-w-0 flex-1 flex-col">
+						<header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
+							<div className="flex items-center gap-3">
+								<Sheet>
+									<SheetTrigger asChild>
+										<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation">
+											<Menu className="h-5 w-5" />
+										</Button>
+									</SheetTrigger>
+									<SheetContent side="left" className="w-72 p-0">
+										<SheetHeader className="sr-only">
+											<SheetTitle>Super admin navigation</SheetTitle>
+										</SheetHeader>
+										<SuperAdminSidebar />
+									</SheetContent>
+								</Sheet>
+								<h1 className="text-base font-semibold text-slate-900 sm:text-lg">Super Admin</h1>
+							</div>
+
+							<div className="flex items-center gap-3">
+								<p className="hidden text-sm text-slate-600 sm:block">{adminEmail}</p>
+								<SuperAdminLogoutButton />
+							</div>
+						</header>
+
+						<main className="flex-1 p-4 sm:p-6 lg:p-8">
+							<div className="mx-auto w-full max-w-7xl">
+								{children}
+							</div>
+						</main>
+					</div>
+				</div>
+				<Separator className="hidden" />
+			</div>
+		)
 	}
 
 	const supabase = createSupabaseServerClient()
+	if (!supabase) {
+		redirect("/signin")
+	}
+
 	const { data: authUserData, error: authUserError } = await supabase.auth.getUser(accessToken)
 
 	if (authUserError || !authUserData?.user) {
-		redirect("/dashboard")
+		redirect("/signin")
 	}
 
 	const { data: profileById, error: profileByIdError } = await supabase
