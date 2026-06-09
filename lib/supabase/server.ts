@@ -4,11 +4,20 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("Missing Supabase service role credentials")
-}
+/**
+ * True only when the server-side Supabase credentials are present.
+ * In environments where they are missing (e.g. the v0 preview), this
+ * stays false instead of crashing the app at module load.
+ */
+export const isSupabaseServerConfigured = Boolean(supabaseUrl && serviceRoleKey)
 
 export function createSupabaseServerClient() {
+  if (!supabaseUrl || !serviceRoleKey) {
+    // Validate lazily at call time rather than at module load so that
+    // importing this file never crashes the app when env vars are absent.
+    throw new Error("Missing Supabase service role credentials")
+  }
+
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
