@@ -32,13 +32,67 @@ const DEPARTMENT_SEED: Record<DepartmentAccess["code"], { slug: string; name: st
   Y: { slug: "leadership", name: "Leadership", is_restricted: true },
 }
 
+// Preview mode sample users
+const PREVIEW_USERS = [
+  {
+    id: "preview-user-1",
+    name: "Kishore",
+    email: "kishore6445@gmail.com",
+    role: "super_admin",
+    status: "active",
+    company_id: null,
+    departments: [
+      { code: "M" as const, permission: "admin" as const },
+      { code: "A" as const, permission: "admin" as const },
+      { code: "S" as const, permission: "admin" as const },
+      { code: "T" as const, permission: "admin" as const },
+      { code: "E" as const, permission: "admin" as const },
+      { code: "R" as const, permission: "admin" as const },
+      { code: "Y" as const, permission: "admin" as const },
+    ],
+    lastUpdated: new Date().toISOString().split("T")[0],
+  },
+  {
+    id: "preview-user-2",
+    name: "Sarah Martinez",
+    email: "sarah@arkmedis.com",
+    role: "member",
+    status: "active",
+    company_id: null,
+    departments: [{ code: "M" as const, permission: "member" as const }],
+    lastUpdated: new Date().toISOString().split("T")[0],
+  },
+  {
+    id: "preview-user-3",
+    name: "John Davidson",
+    email: "john@arkmedis.com",
+    role: "member",
+    status: "active",
+    company_id: null,
+    departments: [{ code: "M" as const, permission: "member" as const }],
+    lastUpdated: new Date().toISOString().split("T")[0],
+  },
+  {
+    id: "preview-user-4",
+    name: "Michael Chen",
+    email: "michael@arkmedis.com",
+    role: "member",
+    status: "active",
+    company_id: null,
+    departments: [
+      { code: "A" as const, permission: "member" as const },
+    ],
+    lastUpdated: new Date().toISOString().split("T")[0],
+  },
+]
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
 function getAdminClient() {
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase service role credentials")
+    return null
   }
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -59,6 +113,11 @@ export async function POST(request: Request) {
     }
 
     const supabase = getAdminClient()
+    
+    // In preview mode, supabase will be null - return error
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase not configured in preview mode." }, { status: 400 })
+    }
 
     const requestOrigin = request.headers.get("origin")
     const forwardedHost = request.headers.get("x-forwarded-host")
@@ -170,6 +229,11 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const supabase = getAdminClient()
+
+    // In preview mode, return mock users
+    if (!supabase) {
+      return NextResponse.json({ users: PREVIEW_USERS }, { status: 200 })
+    }
 
     const { data: users, error: usersError } = await supabase
       .from("users")
