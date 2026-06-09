@@ -38,7 +38,18 @@ function createStubClient(): SupabaseClient {
   return { auth } as unknown as SupabaseClient
 }
 
-export const supabase: SupabaseClient =
-  isSupabaseConfigured
-    ? createBrowserClient(supabaseUrl!, supabaseAnonKey!)
-    : createStubClient()
+function createConfiguredClient(): SupabaseClient {
+  try {
+    return createBrowserClient(supabaseUrl!, supabaseAnonKey!)
+  } catch (err) {
+    console.error(
+      "[supabase] Failed to initialize browser client; falling back to stub.",
+      err,
+    )
+    return createStubClient()
+  }
+}
+
+export const supabase: SupabaseClient = isSupabaseConfigured
+  ? createConfiguredClient()
+  : createStubClient()
