@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { Brand, Department } from "./brand-structure"
 import { supabase } from "@/lib/supabase/browserclient"
+import { isPreviewMode, getPreviewUser, createPreviewSession } from "@/lib/preview-auth"
 
 export type UserRole = "super_admin" | "company_admin" | "member" | "viewer" | "admin"
 
@@ -80,8 +81,50 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const loadUser = async () => {
       try {
         setIsLoading(true)
-        // attempt to grab access token from client session if available
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+        // In preview mode, use mock user
+        if (isPreviewMode()) {
+          console.log("[UserProvider] Preview mode detected - using mock user")
+          
+          // Ensure preview session exists
+          const existingUser = getPreviewUser()
+          if (!existingUser) {
+            console.log("[UserProvider] Creating preview session...")
+            createPreviewSession()
+          }
+          
+          const previewUser = getPreviewUser()
+          if (isActive && previewUser) {
+            const mockUser: User = {
+              id: previewUser.id,
+              name: previewUser.name,
+              email: previewUser.email,
+              role: "super_admin",
+              assignments: [
+                { brand: "warrior-systems", department: "leadership" },
+                { brand: "story-marketing", department: "leadership" },
+                { brand: "meta-gurukul", department: "leadership" },
+              ],
+            }
+            console.log("[UserProvider] Setting mock user:", mockUser)
+            setCurrentUser(mockUser)
+          }
+          if (isActive) setIsLoading(false)
+          return
+        }
+
+        // Production mode: get real session from Supabase
+        console.log("[UserProvider] Production mode - fetching Supabase session")
+        
+        const authModule = supabase?.auth
+        if (!authModule) {
+          console.warn("[UserProvider] Supabase auth module not available")
+          if (isActive) setCurrentUser(null)
+          if (isActive) setIsLoading(false)
+          return
+        }
+
+        const { data: sessionData, error: sessionError } = await authModule.getSession()
         console.log("[UserProvider] supabase sessionData:", sessionData, "error:", sessionError)
         if (!sessionData?.session) {
           console.log("[UserProvider] no session; document.cookie=", document.cookie)
@@ -107,7 +150,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
           return
         }
 
-       // debugger;
         const result = await response.json()
         console.log("[UserProvider] /api/me result:", result)
         if (isActive) setCurrentUser(result?.user || null)
@@ -121,7 +163,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     loadUser()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    // In preview mode, don't set up auth listener
+    if (isPreviewMode()) {
+      return () => {
+        isActive = false
+      }
+    }
+
+    // Production mode: set up auth listener
+    const authModule = supabase?.auth
+    if (!authModule) {
+      console.warn("[UserProvider] Supabase auth module not available for listener")
+      return () => {
+        isActive = false
+      }
+    }
+
+    const { data: authListener } = authModule.onAuthStateChange((event: string) => {
       if (!isActive) return
       if (event === "SIGNED_OUT") {
         setCurrentUser(null)
@@ -155,7 +213,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function  useUser() {
+export function useUser() {
   const context = useContext(UserContext)
   if (context === undefined) {
     throw new Error("useUser must be used within a UserProvider")

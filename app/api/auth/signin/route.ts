@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createPreviewSession, PREVIEW_EMAIL } from "@/lib/preview-auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -9,10 +10,6 @@ type SignInPayload = {
 }
 
 export async function POST(request: Request) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json({ error: "Supabase auth is not configured." }, { status: 500 })
-  }
-
   let payload: SignInPayload
 
   try {
@@ -26,6 +23,19 @@ export async function POST(request: Request) {
 
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 })
+  }
+
+  // Preview mode: allow kishore6445@gmail.com with any password
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (email === PREVIEW_EMAIL) {
+      const session = createPreviewSession()
+      return NextResponse.json(
+        { accessToken: session.access_token, session: { user: session.user, access_token: session.access_token } },
+        { status: 200 },
+      )
+    }
+    // Only allow preview user in preview mode
+    return NextResponse.json({ error: "Preview mode: only kishore6445@gmail.com can sign in." }, { status: 401 })
   }
 
   const controller = new AbortController()
@@ -86,9 +96,7 @@ export async function POST(request: Request) {
         ? ((error as { cause: { code: string } }).cause.code as string)
         : null
 
-       // debugger;
-
-        console.error("Error during authentication request:", error);
+    console.error("Error during authentication request:", error)
     if (causeCode === "UND_ERR_CONNECT_TIMEOUT") {
       return NextResponse.json(
         {

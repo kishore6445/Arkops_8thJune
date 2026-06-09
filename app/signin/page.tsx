@@ -62,14 +62,24 @@ export default function SignInPage() {
   const completeSignIn = async (accessToken: string, sessionObj: any) => {
     try {
       console.log("[signin] setting sessionObj", sessionObj)
+      console.log("[signin] supabase:", supabase)
+      console.log("[signin] typeof supabase:", typeof supabase)
+      
       // additionally set the session on the Supabase client so getSession() works
-      try {
-        console.log("[signin] cookies before setSession", document.cookie)
-        const { data: setData, error: setError } = await supabase.auth.setSession(sessionObj)
-        console.log("[signin] supabase.setSession returned", setData, setError)
-        console.log("[signin] cookies after setSession", document.cookie)
-      } catch (err) {
-        console.warn("Unable to set supabase client session", err)
+      if (typeof window !== "undefined" && supabase && supabase.auth && supabase.auth.setSession) {
+        try {
+          console.log("[signin] cookies before setSession", document.cookie)
+          const { data: setData, error: setError } = await supabase.auth.setSession(sessionObj)
+          console.log("[signin] supabase.setSession returned", setData, setError)
+          console.log("[signin] cookies after setSession", document.cookie)
+        } catch (err) {
+          console.warn("Unable to set supabase client session", err)
+        }
+      } else {
+        console.log("[signin] supabase.auth.setSession not available or not in browser")
+        console.log("[signin] typeof window:", typeof window)
+        console.log("[signin] supabase truthy:", !!supabase)
+        console.log("[signin] supabase.auth truthy:", supabase?.auth ? true : false)
       }
 
       const sessionResponse = await fetch("/api/auth/session", {
