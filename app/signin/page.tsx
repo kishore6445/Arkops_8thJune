@@ -27,51 +27,8 @@ export default function SignInPage() {
     }
   }, [searchParams])
 
-  // now returns the raw session object along with access token
-  const signInViaServer = async (): Promise<{ accessToken: string; session: any }> => {
-    const fallbackResponse = await fetch("/api/auth/signin", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    })
-
-    const fallbackResult = await fallbackResponse.json().catch(() => null)
-    console.log("[signin] server result", fallbackResult)
-
-    if (!fallbackResponse.ok) {
-      throw new Error(
-        fallbackResult?.error || "Authentication service is unreachable. Please check your network and try again.",
-      )
-    }
-
-    const accessToken =
-      (typeof fallbackResult?.accessToken === "string" && fallbackResult.accessToken) ||
-      (typeof fallbackResult?.access_token === "string" && fallbackResult.access_token) ||
-      (typeof fallbackResult?.session?.access_token === "string" && fallbackResult.session.access_token) ||
-      null
-
-    if (!accessToken) {
-      throw new Error("Authentication succeeded but no session token was returned.")
-    }
-
-    return { accessToken, session: fallbackResult.session || fallbackResult }
-  }
-
-  const completeSignIn = async (accessToken: string, sessionObj: any) => {
+  const completeSignIn = async (accessToken: string) => {
     try {
-      console.log("[signin] setting sessionObj", sessionObj)
-      // additionally set the session on the Supabase client so getSession() works
-      try {
-        console.log("[signin] cookies before setSession", document.cookie)
-        const { data: setData, error: setError } = await supabase.auth.setSession(sessionObj)
-        console.log("[signin] supabase.setSession returned", setData, setError)
-        console.log("[signin] cookies after setSession", document.cookie)
-      } catch (err) {
-        console.warn("Unable to set supabase client session", err)
-      }
-
       const sessionResponse = await fetch("/api/auth/session", {
         method: "POST",
         headers: {
@@ -93,22 +50,15 @@ export default function SignInPage() {
         },
       })
 
-      
-
-      console.log("Post-login target response:", targetResponse)
       if (!targetResponse.ok) {
         const result = await targetResponse.json().catch(() => null)
-        console.log("Target response error:", result)
         setErrorMessage(result?.error || "Unable to determine redirect path. Please try again.")
         setIsLoading(false)
         return
       }
 
       const result = await targetResponse.json().catch(() => null)
-      console.log("Post-login target result:", result)
-      console.log("User role from API:", result?.role)
       const redirectTo = typeof result?.redirectTo === "string" ? result.redirectTo : "/dashboard"
-      console.log("Redirecting to:", redirectTo)
       window.location.replace(redirectTo)
     } catch {
       setErrorMessage("Unable to complete sign in right now. Please try again.")
@@ -117,25 +67,30 @@ export default function SignInPage() {
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
+    event.preventDefault()
     setErrorMessage(null)
     setIsLoading(true)
 
-    let accessToken: string
-    let sessionObj: any
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
 
-    try {
-      const res = await signInViaServer()
-      accessToken = res.accessToken
-      sessionObj = res.session
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Authentication service is unreachable. Please check your network and try again."
-      setErrorMessage(message)
+    if (error) {
+      setErrorMessage(error.message)
       setIsLoading(false)
       return
     }
 
-    await completeSignIn(accessToken, sessionObj)
+    const accessToken = data.session?.access_token
+
+    if (!accessToken) {
+      setErrorMessage("Authentication succeeded but no session token was returned.")
+      setIsLoading(false)
+      return
+    }
+
+    await completeSignIn(accessToken)
   }
 
   return (
