@@ -6,47 +6,27 @@ import { getPreviewSession } from "@/lib/preview-auth"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-console.log("[browserclient] supabaseUrl:", supabaseUrl ? "set" : "undefined", "supabaseAnonKey:", supabaseAnonKey ? "set" : "undefined")
-
-let supabaseClient: any = null
-
-function createClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null
-  }
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
-}
-
-export function getSupabaseBrowserClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
-}
-
-// Check if we're in preview mode (missing env vars)
 const isPreviewModeEnabled = !supabaseUrl || !supabaseAnonKey
 
-console.log("[browserclient] isPreviewModeEnabled:", isPreviewModeEnabled)
+let supabaseClient: any = null
+let mockSupabaseClient: any = null
 
-// Mock Supabase client for preview mode
-function createMockSupabaseClient() {
-  console.log("[browserclient] Creating mock Supabase client")
+function createMockClient() {
   const authMock = {
     getSession: async () => {
       const session = getPreviewSession()
-      if (session) {
-        return {
-          data: { session },
-          error: null,
-        }
+      return {
+        data: { session: session || null },
+        error: null,
       }
-      return { data: { session: null }, error: null }
     },
     setSession: async (sessionObj: any) => {
-      // Mock setting session - just return success
-      console.log("[preview-auth] setSession called with:", sessionObj)
+      console.log("[preview-auth] setSession called")
       return { data: sessionObj, error: null }
+    },
+    signOut: async () => {
+      console.log("[preview-auth] signOut called")
+      return { error: null }
     },
     onAuthStateChange: (callback: any) => {
       return {
@@ -57,15 +37,42 @@ function createMockSupabaseClient() {
         },
       }
     },
+    getUser: async () => {
+      return { data: { user: { id: "preview-user" } }, error: null }
+    },
   }
 
-  return {
-    auth: authMock,
-  }
+  return { auth: authMock }
 }
 
-// Export real client if env vars exist, otherwise mock client for preview mode
-const supabaseInstance = isPreviewModeEnabled ? createMockSupabaseClient() : (getSupabaseBrowserClient() || {})
-console.log("[browserclient] supabaseInstance:", supabaseInstance)
+function createClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null
+  }
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+}
 
-export const supabase = supabaseInstance
+export function getSupabaseBrowserClient() {
+  if (isPreviewModeEnabled) {
+    if (!mockSupabaseClient) {
+      mockSupabaseClient = createMockClient()
+    }
+    return mockSupabaseClient
+  }
+  
+  if (!supabaseClient) {
+    supabaseClient = createClient()
+  }
+  return supabaseClient
+}
+
+// Initialize immediately and export as a static object
+const initializeSupabase = () => {
+  if (isPreviewModeEnabled) {
+    return createMockClient()
+  }
+  const client = createClient()
+  return client || {}
+}
+
+export const supabase = initializeSupabase()

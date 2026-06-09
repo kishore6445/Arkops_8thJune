@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createSupabaseServerClient, getSupabaseAccessTokenFromCookies } from "@/lib/supabase/server"
+import { PREVIEW_USER_ID } from "@/lib/preview-auth"
 
 type UserRole = "super_admin" | "company_admin" | "member" | null
 
@@ -16,6 +17,12 @@ export async function redirectAfterLogin() {
 	}
 
 	const supabase = createSupabaseServerClient()
+	
+	// In preview mode, supabase will be null - redirect to dashboard
+	if (!supabase) {
+		redirect("/dashboard")
+	}
+
 	const { data: authUserData, error: authUserError } = await supabase.auth.getUser(accessToken)
 
 	if (authUserError || !authUserData?.user) {
