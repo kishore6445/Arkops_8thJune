@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { PREVIEW_USER_ID } from "@/lib/preview-auth"
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +12,22 @@ export async function POST(request: Request) {
     }
 
     const supabase = createSupabaseServerClient()
+    
+    // In preview mode, supabase will be null - allow the token through
+    if (!supabase) {
+      const response = NextResponse.json({ ok: true })
+      response.cookies.set({
+        name: "app_access_token",
+        value: token,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      })
+      return response
+    }
+
     const { data, error } = await supabase.auth.getUser(token)
 
     if (error || !data?.user) {

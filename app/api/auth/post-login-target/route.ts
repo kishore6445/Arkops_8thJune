@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { PREVIEW_USER_ID } from "@/lib/preview-auth"
 
 function resolveRedirectFromRole(role: unknown) {
   const normalizedRole =
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
     }
 
     const supabase = createSupabaseServerClient()
+    
+    // In preview mode, supabase will be null - redirect to dashboard
+    if (!supabase) {
+      return NextResponse.json({ redirectTo: "/dashboard", role: "super_admin" }, { status: 200 })
+    }
+
     const { data: authUserData, error: authUserError } = await supabase.auth.getUser(token)
 
     if (authUserError || !authUserData?.user) {

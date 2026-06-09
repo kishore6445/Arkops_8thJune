@@ -61,27 +61,22 @@ export default function SignInPage() {
 
   const completeSignIn = async (accessToken: string, sessionObj: any) => {
     try {
-      console.log("[signin] setting sessionObj", sessionObj)
-      console.log("[signin] supabase:", supabase)
-      console.log("[signin] typeof supabase:", typeof supabase)
+      console.log("[signin] completeSignIn called with accessToken")
       
       // additionally set the session on the Supabase client so getSession() works
-      if (typeof window !== "undefined" && supabase && supabase.auth && supabase.auth.setSession) {
+      if (typeof window !== "undefined" && supabase && typeof supabase.auth === "object" && supabase.auth.setSession) {
         try {
-          console.log("[signin] cookies before setSession", document.cookie)
+          console.log("[signin] calling supabase.auth.setSession")
           const { data: setData, error: setError } = await supabase.auth.setSession(sessionObj)
-          console.log("[signin] supabase.setSession returned", setData, setError)
-          console.log("[signin] cookies after setSession", document.cookie)
+          console.log("[signin] setSession returned", setData, setError)
         } catch (err) {
-          console.warn("Unable to set supabase client session", err)
+          console.warn("[signin] Unable to set supabase client session", err)
         }
       } else {
-        console.log("[signin] supabase.auth.setSession not available or not in browser")
-        console.log("[signin] typeof window:", typeof window)
-        console.log("[signin] supabase truthy:", !!supabase)
-        console.log("[signin] supabase.auth truthy:", supabase?.auth ? true : false)
+        console.log("[signin] supabase.auth.setSession not available")
       }
 
+      console.log("[signin] calling /api/auth/session")
       const sessionResponse = await fetch("/api/auth/session", {
         method: "POST",
         headers: {
@@ -89,8 +84,10 @@ export default function SignInPage() {
         },
       })
 
+      console.log("[signin] sessionResponse status:", sessionResponse.status)
       if (!sessionResponse.ok) {
         const result = await sessionResponse.json().catch(() => null)
+        console.log("[signin] session error:", result)
         setErrorMessage(result?.error || "Unable to establish secure session. Please try again.")
         setIsLoading(false)
         return
@@ -103,24 +100,22 @@ export default function SignInPage() {
         },
       })
 
-      
-
-      console.log("Post-login target response:", targetResponse)
+      console.log("[signin] targetResponse status:", targetResponse.status)
       if (!targetResponse.ok) {
         const result = await targetResponse.json().catch(() => null)
-        console.log("Target response error:", result)
+        console.log("[signin] target error:", result)
         setErrorMessage(result?.error || "Unable to determine redirect path. Please try again.")
         setIsLoading(false)
         return
       }
 
       const result = await targetResponse.json().catch(() => null)
-      console.log("Post-login target result:", result)
-      console.log("User role from API:", result?.role)
+      console.log("[signin] target result:", result)
       const redirectTo = typeof result?.redirectTo === "string" ? result.redirectTo : "/dashboard"
-      console.log("Redirecting to:", redirectTo)
+      console.log("[signin] redirecting to:", redirectTo)
       window.location.replace(redirectTo)
-    } catch {
+    } catch (error) {
+      console.error("[signin] completeSignIn error:", error)
       setErrorMessage("Unable to complete sign in right now. Please try again.")
       setIsLoading(false)
     }
