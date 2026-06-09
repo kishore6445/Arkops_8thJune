@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -32,10 +32,38 @@ async function getCompanyBrandSlugs(supabase: ReturnType<typeof getAdminClient>,
     .filter((slug): slug is string => Boolean(slug))
 }
 
-export async function GET(request: Request) {
+// TEMPORARY v0 PREVIEW BYPASS - remove before production if not needed
+function getPreviewUser() {
+  return {
+    id: "preview-user-1",
+    name: "Preview User",
+    email: "preview@example.com",
+    avatar: undefined,
+    role: "super_admin",
+    company_id: null,
+    assignments: [
+      { brand: "warrior-systems", department: "leadership" },
+      { brand: "story-marketing", department: "leadership" },
+      { brand: "meta-gurukul", department: "leadership" },
+    ],
+    company_brand_slugs: [],
+  }
+}
+
+export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization") || ""
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : ""
+
+    // TEMPORARY v0 PREVIEW BYPASS - remove before production if not needed
+    const previewSession = request.cookies.get("preview-session")
+    if (previewSession && !token) {
+      console.log("[api/me] Using preview session bypass")
+      return NextResponse.json(
+        { user: getPreviewUser() },
+        { status: 200 }
+      )
+    }
 
     if (!token) {
       return NextResponse.json({ error: "Missing access token." }, { status: 401 })

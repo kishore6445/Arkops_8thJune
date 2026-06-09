@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase/browserclient"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/browserclient"
 
 export default function SignInPage() {
   const searchParams = useSearchParams()
@@ -93,6 +93,28 @@ export default function SignInPage() {
     await completeSignIn(accessToken)
   }
 
+  // TEMPORARY v0 PREVIEW BYPASS - remove before production if not needed
+  const handlePreviewBypass = async () => {
+    setIsLoading(true)
+    setErrorMessage(null)
+
+    try {
+      const response = await fetch("/api/auth/preview-bypass", { method: "POST" })
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null)
+        setErrorMessage(result?.error || "Preview bypass failed. Please try again.")
+        setIsLoading(false)
+        return
+      }
+
+      window.location.replace("/dashboard")
+    } catch {
+      setErrorMessage("Unable to complete preview bypass. Please try again.")
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-6 py-12">
@@ -152,6 +174,17 @@ export default function SignInPage() {
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
+            {/* TEMPORARY v0 PREVIEW BYPASS - remove before production if not needed */}
+            {!isSupabaseConfigured && (
+              <button
+                type="button"
+                onClick={handlePreviewBypass}
+                disabled={isLoading}
+                className="w-full rounded-full border border-amber-600/50 bg-amber-600/10 px-5 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-600/20"
+              >
+                {isLoading ? "Continuing..." : "Continue in Preview Mode"}
+              </button>
+            )}
             {errorMessage ? (
               <p className="text-sm text-rose-300">{errorMessage}</p>
             ) : null}
