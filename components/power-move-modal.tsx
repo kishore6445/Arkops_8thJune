@@ -324,7 +324,7 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-[900px] w-full p-0 gap-0 max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogContent className=" w-full p-0 gap-0 max-h-[95vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="px-6 pt-6 pb-4 border-b border-gray-100">
             <DialogTitle className="text-lg font-semibold text-gray-900">Add Power Move (Lead Measure)</DialogTitle>
