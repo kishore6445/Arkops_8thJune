@@ -11,6 +11,7 @@ import { TimePeriodSelector } from '@/components/time-period-selector'
 import { ExecutionStreak } from '@/components/execution-streak'
 import { QuarterSelector, type QuarterOption } from '@/components/quarter-selector'
 import { AccountabilitySections } from '@/components/accountability-sections'
+import { PowerMoveCardRedesigned } from '@/components/power-move-card-redesigned'
 import {
   Flame,
   Target,
@@ -679,47 +680,20 @@ export function DepartmentExecutionHero({
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
             {powerMoves.map((pm, index) => {
               const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
-              debugger;
-
-              console.log(`Power Move: ${pm.name}, Target: ${target}, Actual: ${actual}`,selectedPeriod)
 
               const finalTarget = target > 0 ? target : (pm.targetPerCycle ?? pm.weeklyTarget ?? 1)
               const finalActual = actual ?? 0
-              const isCompleted = finalActual >= finalTarget
               const isPrimary = index < 2
 
-              const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-red-500', 'bg-cyan-500']
-              const bgColor = colors[index % colors.length]
-
               return (
-                <div
+                <PowerMoveCardRedesigned
                   key={pm.id}
-                  className='bg-white rounded-xl border border-stone-200/60 shadow-sm p-5 flex flex-col gap-4 hover:shadow-md transition-all'
-                >
-                  <div className='flex items-start gap-3'>
-                    <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0', bgColor)}>
-                      {pm.name?.[0]?.toUpperCase() || '○'}
-                    </div>
-                    <div className='flex-1 min-w-0'>
-                      <p className='text-sm font-bold text-stone-900 line-clamp-2'>{pm.name}</p>
-                      {pm.frequency && (
-                        <p className='text-xs text-stone-500 mt-1'>{pm.frequency}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className='flex-1 flex items-center justify-between pt-2 border-t border-stone-100'>
-                    <span className='text-xs font-semibold text-stone-600'>{finalActual}/{finalTarget}</span>
-                    <Button
-                      size='sm'
-                      variant={isCompleted ? 'outline' : 'secondary'}
-                      onClick={() => onCompletePowerMove?.(pm.id)}
-                      disabled={isCompleted}
-                    >
-                      {isCompleted ? 'Completed' : 'Complete'}
-                    </Button>
-                  </div>
-                </div>
+                  pm={pm}
+                  target={finalTarget}
+                  actual={finalActual}
+                  onComplete={onCompletePowerMove}
+                  isPrimary={isPrimary}
+                />
               )
             })}
           </div>
