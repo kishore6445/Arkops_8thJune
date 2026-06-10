@@ -85,7 +85,7 @@ export function StreakDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-full p-0 gap-0 overflow-hidden rounded-2xl border border-gray-200 shadow-xl">
+      <DialogContent className="w-full p-0 gap-0 overflow-hidden rounded-2xl border border-gray-200 shadow-xl">
 
         {/* ── Modal Header ── */}
         <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
