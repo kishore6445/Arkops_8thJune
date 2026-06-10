@@ -49,6 +49,7 @@ type PowerMoveFormData = {
   ownerId?: string
   linkedVictoryTargetId?: string
   linkedVictoryTargetTitle: string
+  customDays?: string[] // New field for custom day selection
 }
 
 type CompanyBrand = {
@@ -84,6 +85,7 @@ export function AddEditPowerMoveModal({
     ownerId: undefined as string | undefined,
     linkedVictoryTargetId: undefined as string | undefined,
     linkedVictoryTargetTitle: "",
+    customDays: [],
   })
   const [users, setUsers] = useState<UserOption[]>([])
   const [victoryTargets, setVictoryTargets] = useState<VictoryTargetOption[]>([])
@@ -363,6 +365,36 @@ export function AddEditPowerMoveModal({
                 placeholder="10"
                 required
               />
+            </div>
+          </div>
+
+          {/* Custom Days Selection - shows when frequency supports custom scheduling */}
+          <div className="space-y-2">
+            <Label>Schedule Days (Optional)</Label>
+            <p className="text-xs text-muted-foreground mb-2">Select which days this Power Move should be completed</p>
+            <div className="grid grid-cols-7 gap-2">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => {
+                    const days = [...(formData.customDays || [])]
+                    if (days.includes(day)) {
+                      days.splice(days.indexOf(day), 1)
+                    } else {
+                      days.push(day)
+                    }
+                    setFormData({ ...formData, customDays: days })
+                  }}
+                  className={`py-2 px-1 rounded text-sm font-medium transition-colors ${
+                    formData.customDays?.includes(day)
+                      ? "bg-primary text-white"
+                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  }`}
+                >
+                  {day}
+                </button>
+              ))}
             </div>
           </div>
 
