@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PowerMoveModal, type PowerMoveFormData } from "@/components/power-move-modal"
+import { PowerMoveCardRedesigned } from "@/components/power-move-card-redesigned"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/user-context"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -613,75 +614,19 @@ console.log("executionPercentage", executionPercentage)
             <p className='text-sm text-stone-500'>No power moves yet for this period.</p>
           </div>
         ) : (
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4'>
+          <div className='flex flex-col gap-4'>
             {myPowerMoves.map((pm, index) => {
               const { target, actual } = getTargetActualForPeriod(pm, selectedPeriod)
-              const percentage = target > 0 ? Math.round((actual / target) * 100) : 0
-              const isCompleted = actual >= target
               const isPrimary = index < 2
-
-              // Color icons based on index
-              const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-red-500', 'bg-cyan-500']
-              const bgColor = colors[index % colors.length]
-
               return (
-                <div
+                <PowerMoveCardRedesigned
                   key={pm.id}
-                  className='bg-white rounded-xl border border-stone-200/60 shadow-sm p-5 hover:shadow-md transition-all flex flex-col'
-                >
-                  {/* Icon and Header */}
-                  <div className='flex items-start justify-between mb-4'>
-                    <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold text-lg', bgColor)}>
-                      {pm.name?.[0]?.toUpperCase() || '○'}
-                    </div>
-                    {isPrimary && (
-                      <span className='text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded'>
-                        Primary
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Title and Frequency */}
-                  <h3 className='text-sm font-bold text-stone-900 mb-1 line-clamp-2'>{pm.name}</h3>
-                  <p className='text-xs text-stone-500 font-semibold mb-3'>{pm.frequency}</p>
-
-                  {/* Progress */}
-                  <div className='mb-4'>
-                    <div className='flex justify-between items-center mb-1'>
-                      <span className='text-xs font-semibold text-stone-600'>{actual}/{target}</span>
-                      <span className={cn(
-                        'text-xs font-bold px-2 py-0.5 rounded-full',
-                        isCompleted ? 'bg-emerald-100 text-emerald-700' : percentage > 0 ? 'bg-amber-100 text-amber-700' : 'bg-stone-200 text-stone-700'
-                      )}>
-                        {percentage}%
-                      </span>
-                    </div>
-                    <div className='h-1.5 bg-stone-200 rounded-full overflow-hidden'>
-                      <div
-                        className={cn(
-                          'h-full transition-all duration-500',
-                          isCompleted ? 'bg-emerald-600' : percentage > 0 ? 'bg-amber-500' : 'bg-stone-300'
-                        )}
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Button */}
-                  <Button
-                    size='sm'
-                    onClick={() => handleCompletePowerMove(pm.id)}
-                    disabled={isCompleted}
-                    className={cn(
-                      'w-full text-xs font-bold mt-auto',
-                      isCompleted
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 cursor-not-allowed'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    )}
-                  >
-                    {isCompleted ? '✓ Done' : 'Complete'}
-                  </Button>
-                </div>
+                  pm={pm}
+                  target={target}
+                  actual={actual}
+                  onComplete={handleCompletePowerMove}
+                  isPrimary={isPrimary}
+                />
               )
             })}
           </div>
