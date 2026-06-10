@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { AnimatedProgress } from "@/components/animated-progress"
 import { ChevronDown, ChevronUp } from "lucide-react"
-import { useState } from "react"
+import { useState, Suspense } from "react"
+import { useStreakTracker } from "@/lib/use-streak-tracker"
+import { getDayStatusIcon, getStatusColor } from "@/lib/power-move-streak"
 
 interface PowerMove {
   id: string
@@ -21,9 +23,63 @@ interface PowerMove {
 
 interface PowerMoveCardProps {
   move: PowerMove
+  onViewStreak?: (moveId: string) => void
 }
 
-export function PowerMoveCard({ move }: PowerMoveCardProps) {
+function StreakDisplay({ move, onViewStreak }: { move: PowerMove; onViewStreak?: (moveId: string) => void }) {
+  const { stats, isLoading } = useStreakTracker(move.id, move.targetPerCycle, move.frequency as any)
+
+  if (isLoading || !stats) {
+    return null
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Weekly chain visualization */}
+      <div className="flex items-center gap-1 text-sm">
+        {stats.weekDays.slice(0, 5).map((day, idx) => (
+          <div key={idx} className="flex flex-col items-center gap-0.5">
+            <span className="text-xs font-medium">{day.shortDay}</span>
+            <span className="text-lg">{getDayStatusIcon(day.status)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-2 text-xs">
+        <div className="space-y-0.5">
+          <div className="text-muted-foreground">This Week</div>
+          <div className="font-semibold text-sm">{stats.thisWeek}/{move.targetPerCycle}</div>
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-muted-foreground">Streak</div>
+          <div className="font-semibold text-sm">{stats.currentStreak}d</div>
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-muted-foreground">Best</div>
+          <div className="font-semibold text-sm">{stats.bestStreak}d</div>
+        </div>
+        <div className="space-y-0.5">
+          <div className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(stats.status)}`}>
+            {stats.status === "on-track" && "On Track"}
+            {stats.status === "at-risk" && "At Risk"}
+            {stats.status === "missed" && "Missed"}
+          </div>
+        </div>
+      </div>
+
+      {/* View Streak button */}
+      <button
+        onClick={() => onViewStreak?.(move.id)}
+        className="w-full text-xs text-primary hover:underline py-1"
+      >
+        View Streak Details →
+      </button>
+    </div>
+  )
+}
+
+export function PowerMoveCard({ move, onViewStreak }: PowerMoveCardProps) {
   const [expanded, setExpanded] = useState(false)
   const progressPercentage = (move.progress / move.targetPerCycle) * 100
 
@@ -57,6 +113,13 @@ export function PowerMoveCard({ move }: PowerMoveCardProps) {
             </div>
             <AnimatedProgress value={progressPercentage} className="h-2" />
           </div>
+
+          {/* Streak Display (Always visible on expanded) */}
+          {expanded && (
+            <Suspense fallback={<div className="h-20 bg-muted animate-pulse rounded" />}>
+              <StreakDisplay move={move} onViewStreak={onViewStreak} />
+            </Suspense>
+          )}
 
           {/* Owner */}
           <div className="flex items-center gap-2">
