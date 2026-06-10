@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { generatePreviewData } from "@/lib/power-move-preview"
 
 type PowerMove = {
   id: string
@@ -234,223 +235,314 @@ export function AddEditPowerMoveModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{powerMove ? "Edit Power Move" : "Add Power Move"}</DialogTitle>
+          <DialogTitle>{powerMove ? "Edit Power Move (Lead Measure)" : "Add Power Move (Lead Measure)"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="brand">Brand</Label>
-            <Select value={formData.brandId} onValueChange={(value) => setFormData({ ...formData, brandId: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.length === 0 ? (
-                  <SelectItem value="no-brands" disabled>
-                    No brands available
-                  </SelectItem>
-                ) : (
-                  brands.map((brand) => (
-                    <SelectItem key={brand.id} value={brand.brand_slug}>
-                      {brand.brand_name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-500">Select which brand this Power Move belongs to</p>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Select
-                value={formData.department}
-                onValueChange={(value: any) => setFormData({ ...formData, department: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(availableDepartments || ["M", "A", "S", "T", "E", "R", "Y"]).map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code === "M"
-                        ? "Marketing"
-                        : code === "A"
-                          ? "Accounts/Finance"
-                          : code === "S"
-                            ? "Sales"
-                            : code === "T"
-                              ? "Team Tools & SOPs"
-                              : code === "E"
-                                ? "Execution/Ops"
-                                : code === "R"
-                                  ? "R&D/Risk"
-                                  : "Leadership"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="grid grid-cols-2 gap-6">
+          {/* LEFT SECTION: Form */}
+          <div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="name">Title *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Daily Report Update"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">e.g., Webinars Conducted</p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="owner">Owner</Label>
-              <Select
-                value={formData.ownerId || ""}
-                onValueChange={(value) => {
-                  const selectedUser = users.find((user) => user.id === value)
-                  setFormData({
-                    ...formData,
-                    ownerId: value || undefined,
-                    owner: selectedUser?.name || "",
-                  })
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select owner"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((user) => !user.role?.toLowerCase().includes("admin"))
-                    .map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {usersError ? <p className="text-sm text-rose-600">{usersError}</p> : null}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Power Move Name (Lead Measure)</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Client Discovery Calls"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="frequency">Frequency</Label>
-              <Select
-                value={formData.frequency}
-                onValueChange={(value: "daily" | "weekly" | "monthly") =>
-                  setFormData({ ...formData, frequency: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="weeklyTarget">Weekly Target</Label>
-              <Input
-                id="weeklyTarget"
-                type="number"
-                value={formData.weeklyTarget}
-                onChange={(e) => setFormData({ ...formData, weeklyTarget: Number(e.target.value) })}
-                placeholder="10"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Custom Days Selection - shows when frequency supports custom scheduling */}
-          <div className="space-y-2">
-            <Label>Schedule Days (Optional)</Label>
-            <p className="text-xs text-muted-foreground mb-2">Select which days this Power Move should be completed</p>
-            <div className="grid grid-cols-7 gap-2">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => {
-                    const days = [...(formData.customDays || [])]
-                    if (days.includes(day)) {
-                      days.splice(days.indexOf(day), 1)
-                    } else {
-                      days.push(day)
+              {/* Frequency and Repeat On */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="frequency">Frequency *</Label>
+                  <Select
+                    value={formData.frequency}
+                    onValueChange={(value: "daily" | "weekly" | "monthly") =>
+                      setFormData({ ...formData, frequency: value })
                     }
-                    setFormData({ ...formData, customDays: days })
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Repeat On *</Label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const days = [...(formData.customDays || [])]
+                          if (days.includes(day)) {
+                            days.splice(days.indexOf(day), 1)
+                          } else {
+                            days.push(day)
+                          }
+                          setFormData({ ...formData, customDays: days })
+                        }}
+                        className={`py-2 px-1.5 rounded text-xs font-semibold transition-colors ${
+                          formData.customDays?.includes(day)
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Select the days this power move is expected to be completed.</p>
+                </div>
+              </div>
+
+              {/* Target Per Cycle and Start Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="weeklyTarget">Target Per Cycle *</Label>
+                  <Input
+                    id="weeklyTarget"
+                    type="number"
+                    value={formData.weeklyTarget}
+                    onChange={(e) => setFormData({ ...formData, weeklyTarget: Number(e.target.value) })}
+                    placeholder="5"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Based on selected days (Mon-Fri)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    defaultValue="2026-06-10"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">When tracking should begin</p>
+                </div>
+              </div>
+
+              {/* End Date */}
+              <div className="space-y-2">
+                <Label htmlFor="endDate">End Date (Optional)</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  placeholder="Leave empty for no end date"
+                />
+                <p className="text-xs text-muted-foreground">Leave empty for no end date</p>
+              </div>
+
+              {/* Owner */}
+              <div className="space-y-2">
+                <Label htmlFor="owner">Owner *</Label>
+                <Select
+                  value={formData.ownerId || ""}
+                  onValueChange={(value) => {
+                    const selectedUser = users.find((user) => user.id === value)
+                    setFormData({
+                      ...formData,
+                      ownerId: value || undefined,
+                      owner: selectedUser?.name || "",
+                    })
                   }}
-                  className={`py-2 px-1 rounded text-sm font-medium transition-colors ${
-                    formData.customDays?.includes(day)
-                      ? "bg-primary text-white"
-                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                  }`}
                 >
-                  {day}
-                </button>
-              ))}
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select owner"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users
+                      .filter((user) => !user.role?.toLowerCase().includes("admin"))
+                      .map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name} ({user.email})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Select the owner responsible for this power move.</p>
+              </div>
+
+              {/* Victory Target */}
+              <div className="space-y-2">
+                <Label htmlFor="linkedVictoryTarget">Link to Victory Targets (Optional)</Label>
+                {filteredVictoryTargets.length > 0 ? (
+                  <Select
+                    value={formData.linkedVictoryTargetId || ""}
+                    onValueChange={(value) => {
+                      const selectedTarget = victoryTargets.find((target) => target.id === value)
+                      setFormData({
+                        ...formData,
+                        linkedVictoryTargetId: value,
+                        linkedVictoryTargetTitle: selectedTarget?.title || "",
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingTargets ? "Loading..." : "Select victory target"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredVictoryTargets.map((target) => (
+                        <SelectItem key={target.id} value={target.id}>
+                          {target.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    {formData.ownerId
+                      ? "No victory targets found for selected filters."
+                      : "Choose a victory target to link this power move."}
+                  </p>
+                )}
+              </div>
+
+              {/* Auto-create checkbox */}
+              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="autocreate"
+                  defaultChecked
+                  className="mt-1"
+                />
+                <label htmlFor="autocreate" className="text-sm">
+                  <strong>Auto-create recurring tasks</strong>
+                  <p className="text-xs text-muted-foreground mt-1">Automatically create tasks for the selected days.</p>
+                </label>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="outline" onClick={handleSubmit}>
+                  Save & Add Another
+                </Button>
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Save
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* RIGHT SECTION: Preview */}
+          <div className="space-y-6 border-l pl-6">
+            <div>
+              <h3 className="font-semibold text-lg mb-3">Preview Summary</h3>
+              <p className="text-sm text-muted-foreground mb-4">This is how the power move will be tracked.</p>
+              
+              {(() => {
+                const preview = generatePreviewData(formData.frequency, formData.weeklyTarget, undefined, formData.customDays)
+                return (
+                  <div className="space-y-4">
+                    {/* Frequency and Target */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Frequency</span>
+                        <span className="font-semibold text-sm">Custom Days (Mon, Tue, Wed, Thu, Fri)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Target Per Cycle</span>
+                        <span className="font-semibold text-sm">{formData.weeklyTarget} times per week</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Start Date</span>
+                        <span className="font-semibold text-sm">Jun 10, 2026</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">First Cycle</span>
+                        <span className="font-semibold text-sm">Jun 10 - Jun 14, 2026</span>
+                      </div>
+                    </div>
+
+                    {/* Weekly View Example */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">Weekly View Example</h4>
+                      <div className="grid grid-cols-5 gap-2">
+                        {preview.weeklyView.map((day) => (
+                          <div key={day.day} className="text-center">
+                            <div className="text-xs font-semibold text-muted-foreground mb-1">{day.day}</div>
+                            <div className="text-2xl">{day.status === "completed" ? "✓" : "⭕"}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-4 mt-3 text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="text-lg">✓</span>
+                          <span>Target</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-lg">1</span>
+                          <span>Completed</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Monthly Calendar Example */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">Monthly Calendar Example</h4>
+                      <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                        <div className="text-sm font-semibold mb-2">June 2026</div>
+                        <div className="grid grid-cols-7 gap-1 text-xs">
+                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                            <div key={d} className="text-center font-semibold text-muted-foreground py-1">
+                              {d}
+                            </div>
+                          ))}
+                          {preview.monthlyCalendar.slice(0, 30).map((day, idx) => (
+                            <div
+                              key={idx}
+                              className={`text-center py-1 rounded text-xs font-medium ${
+                                day.status === "completed"
+                                  ? "bg-green-100 text-green-700"
+                                  : day.status === "missed"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {day.date}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex gap-4 mt-3 text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="w-3 h-3 bg-green-100 rounded border border-green-200"></span>
+                          <span>Completed</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="w-3 h-3 bg-red-100 rounded border border-red-200"></span>
+                          <span>Missed</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="w-3 h-3 bg-gray-100 rounded border border-gray-200"></span>
+                          <span>Not Due</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="linkedVictoryTarget">Linked Victory Target</Label>
-            {filteredVictoryTargets.length > 0 ? (
-              <Select
-                value={formData.linkedVictoryTargetId || ""}
-                onValueChange={(value) => {
-                  const selectedTarget = victoryTargets.find((target) => target.id === value)
-                  setFormData({
-                    ...formData,
-                    linkedVictoryTargetId: value,
-                    linkedVictoryTargetTitle: selectedTarget?.title || "",
-                  })
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={isLoadingTargets ? "Loading victory targets..." : "Select victory target"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredVictoryTargets.map((target) => (
-                    <SelectItem key={target.id} value={target.id}>
-                      {target.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm text-gray-500">
-                {formData.ownerId
-                  ? "No victory targets found for selected filters."
-                  : "Select an owner to see available victory targets (or choose department to view)."}
-              </p>
-            )}
-            {targetsError ? <p className="text-sm text-rose-600">{targetsError}</p> : null}
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              <strong>Lead Measure:</strong> This Power Move should be predictive and influenceable. When warriors
-              complete this activity consistently, it should drive progress toward the linked Victory Target.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              {powerMove ? "Update" : "Create"} Power Move
-            </Button>
-          </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   )
