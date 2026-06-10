@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2 } from "lucide-react"
+import { Loader2, ChevronRight, Info, CheckCircle2, XCircle, Circle } from "lucide-react"
 import ConfirmationDialog from "@/components/confirmation-dialog"
 
 interface PowerMoveModalProps {
@@ -27,8 +28,12 @@ export interface PowerMoveFormData {
   linkedVictoryTargets: string[]
   autoCreateTasks: boolean
   selectedDays: string[]
+  startDate?: string
+  endDate?: string
+  description?: string
 }
 
+const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 type UserOption = {
@@ -36,6 +41,45 @@ type UserOption = {
   name: string
   email: string
   role?: string
+}
+
+// Utility: get current month calendar data
+function getMonthCalendar(selectedDays: string[]) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+
+  // day of week for first day (0=Sun, adjust to Mon=0)
+  const startDow = (firstDay.getDay() + 6) % 7
+
+  const cells: { date: number | null; status: "completed" | "missed" | "not-due" | "future" | "blank" }[] = []
+
+  for (let i = 0; i < startDow; i++) {
+    cells.push({ date: null, status: "blank" })
+  }
+
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  const today = now.getDate()
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dow = (new Date(year, month, d).getDay() + 6) % 7
+    const dayName = dayNames[dow]
+    const isDue = selectedDays.length === 0 || selectedDays.includes(dayName)
+
+    if (!isDue) {
+      cells.push({ date: d, status: "not-due" })
+    } else if (d < today - 2) {
+      cells.push({ date: d, status: "completed" })
+    } else if (d < today) {
+      cells.push({ date: d, status: "missed" })
+    } else {
+      cells.push({ date: d, status: "future" })
+    }
+  }
+
+  return { cells, month: now.toLocaleString("default", { month: "long" }), year }
 }
 
 export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: PowerMoveModalProps) {
@@ -49,9 +93,22 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [usersError, setUsersError] = useState<string | null>(null)
 
+  const [formData, setFormData] = useState<PowerMoveFormData>({
+    title: "",
+    frequency: "weekly",
+    targetPerCycle: 0,
+    owner: "",
+    ownerId: undefined,
+    linkedVictoryTargets: [],
+    autoCreateTasks: true,
+    selectedDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
+    description: "",
+  })
+
   const validateField = (field: string, value: any) => {
     const newErrors = { ...errors }
-    console.log("Validating field:", field, value)
     switch (field) {
       case "title":
         if (!value || value.trim().length === 0) {
@@ -77,7 +134,6 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
         }
         break
       case "linkedVictoryTargets":
-       // debugger;
         if (availableVictoryTargets.length > 0 && value.length === 0) {
           newErrors.linkedVictoryTargets = "Please link at least one Victory Target"
         } else {
@@ -85,7 +141,6 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
         }
         break
     }
-
     setErrors(newErrors)
   }
 
@@ -132,8 +187,11 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
           targetPerCycle: 0,
           owner: "",
           linkedVictoryTargets: [],
-          autoCreateTasks: false,
-          selectedDays: [],
+          autoCreateTasks: true,
+          selectedDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          startDate: new Date().toISOString().split("T")[0],
+          endDate: "",
+          description: "",
         })
         setErrors({})
       } else {
@@ -159,17 +217,6 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
     })
   }
 
-  const [formData, setFormData] = useState<PowerMoveFormData>({
-    title: "",
-    frequency: "weekly",
-    targetPerCycle: 0,
-    owner: "",
-    ownerId: undefined,
-    linkedVictoryTargets: [],
-    autoCreateTasks: false,
-    selectedDays: [],
-  })
-
   useEffect(() => {
     const hasAnyChange =
       formData.title !== "" ||
@@ -190,7 +237,6 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
   const normalizeName = (value?: string) => value?.trim().toLowerCase() || ""
 
   const ownerFilteredTargets = victoryTargets.filter((target) => {
-   // debugger;
     if (!formData.owner && !formData.ownerId) return false
     if (formData.ownerId && target.ownerId) {
       return target.ownerId === formData.ownerId
@@ -223,7 +269,6 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
           setUsers([])
           return
         }
-
         if (Array.isArray(result.users)) {
           setUsers(result.users)
         } else {
@@ -254,224 +299,453 @@ export function PowerMoveModal({ open, onOpenChange, onSave, victoryTargets }: P
     onOpenChange(false)
   }
 
-  const progressCycleCount = Math.max(0, Math.floor(formData.targetPerCycle || 0))
-  const progressCycleVisible = Math.min(progressCycleCount, 30)
-  const progressCycleOverflow = Math.max(0, progressCycleCount - progressCycleVisible)
+  // Derive preview values
+  const activeDays = formData.selectedDays.length > 0 ? formData.selectedDays : ["Mon", "Tue", "Wed", "Thu", "Fri"]
+  const frequencyLabel =
+    formData.frequency === "weekly" && activeDays.length > 0
+      ? `Custom Days (${activeDays.join(", ")})`
+      : formData.frequency.charAt(0).toUpperCase() + formData.frequency.slice(1)
+
+  const startDateFormatted = formData.startDate
+    ? new Date(formData.startDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "—"
+
+  const getFirstCycle = () => {
+    if (!formData.startDate) return "—"
+    const start = new Date(formData.startDate + "T00:00:00")
+    const end = new Date(start)
+    end.setDate(end.getDate() + 4)
+    return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+  }
+
+  const weeklyViewDays = ["Mon", "Tue", "Wed", "Thu", "Fri"].filter((d) => activeDays.includes(d))
+  const { cells: calendarCells, month: calMonth, year: calYear } = getMonthCalendar(activeDays)
 
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Power Move (Lead Measure)</DialogTitle>
-            <DialogDescription>Create a new power move that drives your victory targets</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-[900px] w-full p-0 gap-0 max-h-[95vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+            <DialogTitle className="text-lg font-semibold text-gray-900">Add Power Move (Lead Measure)</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-0.5">
+              Create a new power move that drives your victory targets
+            </DialogDescription>
+          </div>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                ref={titleInputRef}
-                id="title"
-                placeholder="e.g., Webinars Conducted"
-                value={formData.title}
-                onChange={(e) => {
-                  setFormData({ ...formData, title: e.target.value })
-                  validateField("title", e.target.value)
-                }}
-                onBlur={() => validateField("title", formData.title)}
-                className={errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}
-              />
-              {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
-            </div>
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* LEFT: Form */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="frequency">Frequency *</Label>
-                <Select value={formData.frequency} onValueChange={(v) => setFormData({ ...formData, frequency: v })}>
-                  <SelectTrigger id="frequency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Title */}
+              <div className="space-y-1.5">
+                <Label htmlFor="title" className="text-sm font-medium text-gray-700">Title *</Label>
+                <Input
+                  ref={titleInputRef}
+                  id="title"
+                  placeholder="e.g., Webinars Conducted"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value })
+                    validateField("title", e.target.value)
+                  }}
+                  onBlur={() => validateField("title", formData.title)}
+                  className={`h-9 text-sm ${errors.title ? "border-red-500 focus-visible:ring-red-500" : "border-gray-300"}`}
+                />
+                {errors.title
+                  ? <p className="text-xs text-red-600">{errors.title}</p>
+                  : <p className="text-xs text-gray-400">e.g., Webinars Conducted</p>
+                }
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="targetPerCycle">Target Per Cycle *</Label>
-                <Input
-                  id="targetPerCycle"
-                  type="number"
-                  placeholder="0"
-                  value={formData.targetPerCycle || ""}
-                  onChange={(e) => {
-                    const value = Number(e.target.value)
-                    setFormData({ ...formData, targetPerCycle: value })
-                    validateField("targetPerCycle", value)
-                  }}
-                  onBlur={() => validateField("targetPerCycle", formData.targetPerCycle)}
-                  className={errors.targetPerCycle ? "border-red-500 focus-visible:ring-red-500" : ""}
-                />
-                {errors.targetPerCycle && <p className="text-sm text-red-600">{errors.targetPerCycle}</p>}
-                <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Progress</span>
-                    {progressCycleCount > 0 && (
-                      <span className="text-xs text-stone-500">Cycles: {progressCycleCount}</span>
-                    )}
+              {/* Frequency + Repeat On */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">Frequency *</Label>
+                  <Select value={formData.frequency} onValueChange={(v) => setFormData({ ...formData, frequency: v })}>
+                    <SelectTrigger className="h-9 text-sm border-gray-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Custom Days</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">Repeat On *</Label>
+                  <div className="flex gap-1.5">
+                    {ALL_DAYS.map((day) => {
+                      const selected = formData.selectedDays.includes(day)
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleDay(day)}
+                          className={`h-8 w-9 rounded text-xs font-semibold transition-colors ${
+                            selected
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      )
+                    })}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    {progressCycleCount === 0 ? (
-                      <span className="text-xs text-stone-400">Enter a target to preview progress.</span>
-                    ) : (
-                      <>
-                        {Array.from({ length: progressCycleVisible }).map((_, index) => (
-                          <span key={index} className="text-lg font-semibold leading-none text-stone-400">
-                            -
-                          </span>
-                        ))}
-                        {progressCycleOverflow > 0 && (
-                          <span className="text-xs text-stone-500">+{progressCycleOverflow} more</span>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <p className="text-xs text-gray-400">Select the days this power move is expected to be completed.</p>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="owner">Owner *</Label>
-              <Select
-                value={formData.ownerId ?? formData.owner}
-                onValueChange={(value) => {
-                  const selected = users.find((user) => user.id === value || user.name === value)
-                  const nextOwner = selected?.name ?? value
-                  const nextOwnerId = selected?.id
-                  setFormData({
-                    ...formData,
-                    owner: nextOwner,
-                    ownerId: nextOwnerId,
-                    linkedVictoryTargets: [],
-                  })
-                  validateField("owner", nextOwner)
-                }}
-              >
-                <SelectTrigger id="owner" className={errors.owner ? "border-red-500 focus-visible:ring-red-500" : ""}>
-                  <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select owner"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {users
-                    .filter((user) => !user.role?.toLowerCase().includes("admin"))
-                    .map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {errors.owner && <p className="text-sm text-red-600">{errors.owner}</p>}
-              {usersError ? <p className="text-sm text-rose-600">{usersError}</p> : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Link to Victory Targets *</Label>
-              <Select
-                value={formData.linkedVictoryTargets[0] || ""}
-                onValueChange={(value) => {
-                  const nextTargets = value ? [value] : []
-                  setFormData({ ...formData, linkedVictoryTargets: nextTargets })
-                  validateField("linkedVictoryTargets", nextTargets)
-                }}
-                disabled={!formData.owner || availableVictoryTargets.length === 0}
-              >
-                <SelectTrigger
-                  className={errors.linkedVictoryTargets ? "border-red-500 focus-visible:ring-red-500" : ""}
-                >
-                  <SelectValue
-                    placeholder={
-                      !formData.owner
-                        ? "Select owner first"
-                        : availableVictoryTargets.length === 0
-                          ? "No victory targets for this owner"
-                          : "Select victory target"
-                    }
+              {/* Target Per Cycle + Start Date + End Date */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">Target Per Cycle *</Label>
+                  <Input
+                    type="number"
+                    placeholder="5"
+                    value={formData.targetPerCycle || ""}
+                    onChange={(e) => {
+                      const value = Number(e.target.value)
+                      setFormData({ ...formData, targetPerCycle: value })
+                      validateField("targetPerCycle", value)
+                    }}
+                    onBlur={() => validateField("targetPerCycle", formData.targetPerCycle)}
+                    className={`h-9 text-sm ${errors.targetPerCycle ? "border-red-500" : "border-gray-300"}`}
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableVictoryTargets.map((target) => (
-                    <SelectItem key={target.id} value={target.id}>
-                      {target.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formData.owner ? (
-                ownerFilteredTargets.length > 0 ? (
-                  <p className="text-xs text-stone-500">
-                    Available for {formData.owner}: {ownerFilteredTargets.map((target) => target.title).join(", ")}
-                  </p>
-                ) : (
-                  <p className="text-xs text-stone-500">No victory targets found for {formData.owner}.</p>
-                )
-              ) : (
-                <p className="text-xs text-stone-500">Choose an owner to load their victory targets.</p>
-              )}
-              {errors.linkedVictoryTargets && (
-                <p className="text-sm text-red-600">{errors.linkedVictoryTargets}</p>
-              )}
-            </div>
+                  {errors.targetPerCycle
+                    ? <p className="text-xs text-red-600">{errors.targetPerCycle}</p>
+                    : <p className="text-xs text-gray-400">Based on selected days (Mon–Fri)</p>
+                  }
+                </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">Start Date *</Label>
+                  <div className="relative">
+                    <Input
+                      type="date"
+                      value={formData.startDate || ""}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="h-9 text-sm border-gray-300 pr-8"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">When tracking should begin</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">End Date <span className="font-normal text-gray-400">(Optional)</span></Label>
+                  <Input
+                    type="date"
+                    value={formData.endDate || ""}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="h-9 text-sm border-gray-300"
+                  />
+                  <p className="text-xs text-gray-400">Leave empty for no end date</p>
+                </div>
+              </div>
+
+              {/* Owner + Victory Target */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">Owner *</Label>
+                  <Select
+                    value={formData.ownerId ?? formData.owner}
+                    onValueChange={(value) => {
+                      const selected = users.find((user) => user.id === value || user.name === value)
+                      const nextOwner = selected?.name ?? value
+                      const nextOwnerId = selected?.id
+                      setFormData({ ...formData, owner: nextOwner, ownerId: nextOwnerId, linkedVictoryTargets: [] })
+                      validateField("owner", nextOwner)
+                    }}
+                  >
+                    <SelectTrigger className={`h-9 text-sm ${errors.owner ? "border-red-500" : "border-gray-300"}`}>
+                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select owner"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users
+                        .filter((user) => !user.role?.toLowerCase().includes("admin"))
+                        .map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name} ({user.email})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.owner
+                    ? <p className="text-xs text-red-600">{errors.owner}</p>
+                    : <p className="text-xs text-gray-400">Select the owner responsible for this power move.</p>
+                  }
+                  {usersError && <p className="text-xs text-rose-600">{usersError}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Link to Victory Targets <span className="font-normal text-gray-400">(Optional)</span>
+                  </Label>
+                  <Select
+                    value={formData.linkedVictoryTargets[0] || ""}
+                    onValueChange={(value) => {
+                      const nextTargets = value ? [value] : []
+                      setFormData({ ...formData, linkedVictoryTargets: nextTargets })
+                      validateField("linkedVictoryTargets", nextTargets)
+                    }}
+                    disabled={!formData.owner || availableVictoryTargets.length === 0}
+                  >
+                    <SelectTrigger className={`h-9 text-sm ${errors.linkedVictoryTargets ? "border-red-500" : "border-gray-300"}`}>
+                      <SelectValue
+                        placeholder={
+                          !formData.owner
+                            ? "Select owner first"
+                            : availableVictoryTargets.length === 0
+                              ? "No victory targets"
+                              : "Select victory target"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableVictoryTargets.map((target) => (
+                        <SelectItem key={target.id} value={target.id}>
+                          {target.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.linkedVictoryTargets
+                    ? <p className="text-xs text-red-600">{errors.linkedVictoryTargets}</p>
+                    : <p className="text-xs text-gray-400">Choose a victory target to link this power move.</p>
+                  }
+                </div>
+              </div>
+
+              {/* Auto-create */}
+              <div className="flex items-start gap-2.5 p-3 rounded-md border border-gray-200 bg-gray-50">
                 <Checkbox
                   id="autoCreateTasks"
                   checked={formData.autoCreateTasks}
                   onCheckedChange={(checked) => setFormData({ ...formData, autoCreateTasks: checked as boolean })}
+                  className="mt-0.5"
                 />
-                <label htmlFor="autoCreateTasks" className="text-sm font-medium cursor-pointer">
-                  Auto-create recurring tasks
-                </label>
+                <div>
+                  <label htmlFor="autoCreateTasks" className="text-sm font-medium text-gray-800 cursor-pointer">
+                    Auto-create recurring tasks
+                  </label>
+                  <p className="text-xs text-gray-500 mt-0.5">Automatically create tasks for the selected days.</p>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Description <span className="font-normal text-gray-400">(Optional)</span></Label>
+                <Textarea
+                  placeholder="Update daily report and submit to the marketing head."
+                  value={formData.description || ""}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="text-sm border-gray-300 min-h-[72px] resize-none"
+                />
+              </div>
+
+              {/* Footer buttons */}
+              <div className="flex items-center justify-between pt-2 pb-1">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isLoading}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSave(true)}
+                    disabled={isLoading}
+                    className="text-sm border-gray-300 text-gray-700"
+                  >
+                    {isLoading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                    Save & Add Another
+                  </Button>
+                  <Button
+                    onClick={() => handleSave(false)}
+                    disabled={isLoading}
+                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isLoading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                    Save
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {formData.autoCreateTasks && formData.frequency === "weekly" && (
-              <div className="space-y-2">
-                <Label>Days of Week</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {DAYS_OF_WEEK.map((day) => (
-                    <div key={day} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`day-${day}`}
-                        checked={formData.selectedDays.includes(day)}
-                        onCheckedChange={() => toggleDay(day)}
-                      />
-                      <label htmlFor={`day-${day}`} className="text-sm cursor-pointer">
-                        {day.substring(0, 3)}
-                      </label>
-                    </div>
+            {/* RIGHT: Preview Panel */}
+            <div className="w-[280px] shrink-0 border-l border-gray-100 bg-gray-50 overflow-y-auto px-5 py-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Preview Summary</h3>
+              <p className="text-xs text-gray-500 mb-4">This is how the power move will be tracked.</p>
+
+              {/* Frequency */}
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Frequency</p>
+                <p className="text-sm font-medium text-gray-900">{frequencyLabel}</p>
+              </div>
+
+              {/* Target Per Cycle */}
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Target Per Cycle</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {formData.targetPerCycle > 0 ? `${formData.targetPerCycle} times per week` : "—"}
+                </p>
+              </div>
+
+              {/* Start Date */}
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Start Date</p>
+                <p className="text-sm font-medium text-gray-900">{startDateFormatted}</p>
+              </div>
+
+              {/* First Cycle */}
+              <div className="mb-5">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">First Cycle</p>
+                <p className="text-sm font-medium text-gray-900">{getFirstCycle()}</p>
+              </div>
+
+              {/* Weekly View Example */}
+              <div className="mb-5">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Weekly View Example</p>
+                <div className="grid grid-cols-5 gap-1">
+                  {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) => {
+                    const active = activeDays.includes(d)
+                    return (
+                      <div key={d} className="flex flex-col items-center gap-1">
+                        <span className="text-[11px] font-medium text-gray-500">{d}</span>
+                        {active ? (
+                          <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M2.5 7L5.5 10L11.5 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className="w-7 h-7 rounded-full border-2 border-gray-200 bg-white" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="grid grid-cols-5 gap-1 mt-1.5">
+                  <span className="text-[10px] text-center text-gray-400 col-span-1">Target</span>
+                  {["Mon", "Tue", "Wed", "Thu", "Fri"].slice(1).map((d) => (
+                    <span key={d} className="text-[10px] text-center text-gray-400">
+                      {activeDays.includes(d) ? "1" : "—"}
+                    </span>
                   ))}
                 </div>
               </div>
-            )}
+
+              {/* Monthly Calendar Example */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-700">Monthly Calendar Example</p>
+                  <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                </div>
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <p className="text-xs font-semibold text-gray-800 mb-2">{calMonth} {calYear}</p>
+                  {/* Day headers */}
+                  <div className="grid grid-cols-7 gap-0.5 mb-1">
+                    {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+                      <span key={d} className="text-[10px] text-center font-medium text-gray-400">{d}</span>
+                    ))}
+                  </div>
+                  {/* Calendar cells */}
+                  <div className="grid grid-cols-7 gap-0.5">
+                    {calendarCells.map((cell, idx) => {
+                      if (cell.status === "blank") {
+                        return <div key={idx} />
+                      }
+                      const isToday = cell.date === new Date().getDate()
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-full aspect-square flex items-center justify-center rounded text-[10px] font-medium relative ${
+                            cell.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : cell.status === "missed"
+                                ? "border border-red-400 text-red-500"
+                                : cell.status === "not-due"
+                                  ? "text-gray-300"
+                                  : "text-gray-600"
+                          }`}
+                        >
+                          {cell.date}
+                          {cell.status === "completed" && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            </span>
+                          )}
+                          {cell.status === "missed" && (
+                            <span className="absolute -top-0.5 -right-0.5">
+                              <XCircle className="h-3 w-3 text-red-500 bg-white rounded-full" />
+                            </span>
+                          )}
+                          {cell.status !== "completed" && cell.status !== "missed" && cell.date}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Circle className="h-3.5 w-3.5 text-gray-300" />
+                    <span className="text-xs text-gray-500">Due / Not Completed</span>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500 ml-2" />
+                    <span className="text-xs text-gray-500">Completed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-3.5 w-3.5 text-red-500" />
+                    <span className="text-xs text-gray-500">Missed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Circle className="h-3.5 w-3.5 text-gray-200" />
+                    <span className="text-xs text-gray-500">Not Due</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => handleSave(true)} disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save & Add Another
-            </Button>
-            <Button onClick={() => handleSave(false)} disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save
-            </Button>
+          {/* Bottom: How it works + Legend */}
+          <div className="border-t border-gray-100 bg-white">
+            <div className="px-6 py-3 bg-blue-50 border-t border-blue-100 flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+              <div>
+                <span className="text-xs font-semibold text-blue-700">How it works</span>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Power move will be created for selected days (Mon–Fri). Each day will be tracked. Streaks will be calculated based on consecutive completed days.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 flex items-center gap-6">
+              <span className="text-xs font-semibold text-gray-600">Legend (Dashboard &amp; Calendar)</span>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <span className="text-xs text-gray-600">Completed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <XCircle className="h-3.5 w-3.5 text-red-500" />
+                <span className="text-xs text-gray-600">Missed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Circle className="h-3.5 w-3.5 text-gray-400" />
+                <span className="text-xs text-gray-600">Not Completed / Due</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Circle className="h-3.5 w-3.5 text-gray-200" />
+                <span className="text-xs text-gray-600">Not Due / Future</span>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
