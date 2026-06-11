@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PowerMoveModal, type PowerMoveFormData } from "@/components/power-move-modal"
 import { PowerMoveCardRedesigned } from "@/components/power-move-card-redesigned"
+import { TaskCard } from "@/components/task-card"
+import { TaskModal } from "@/components/task-modal"
+import { useTasks } from "@/lib/use-tasks"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/user-context"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -32,6 +35,11 @@ export function IndividualDashboard({
   const [isTrackingLoading, setIsTrackingLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("today")
   const [showPowerMoveModal, setShowPowerMoveModal] = useState(false)
+  
+  // Tasks state
+  const { tasks, addTask, updateTask, deleteTask, completeTask } = useTasks()
+  const [showTaskModal, setShowTaskModal] = useState(false)
+  const [editingTask, setEditingTask] = useState<any>(null)
 
   useEffect(() => {
     let isActive = true
@@ -352,6 +360,30 @@ console.log("executionPercentage", executionPercentage)
     return actual >= target
   }).length
 
+  // Task handlers
+  const handleSaveTask = (taskData: any) => {
+    if (editingTask) {
+      updateTask(editingTask.id, taskData)
+      setEditingTask(null)
+    } else {
+      addTask(taskData)
+    }
+    setShowTaskModal(false)
+  }
+
+  const handleEditTask = (task: any) => {
+    setEditingTask(task)
+    setShowTaskModal(true)
+  }
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask(taskId)
+  }
+
+  const handleCompleteTask = (taskId: string) => {
+    completeTask(taskId)
+  }
+
   if (isLoadingData || isUserLoading || isTrackingLoading) {
     return (
       <div className="flex items-center justify-center min-h-[420px]">
@@ -633,11 +665,60 @@ console.log("executionPercentage", executionPercentage)
         )}
       </div>
 
+      {/* Tasks Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-stone-900">Tasks</h2>
+            <p className="text-xs text-stone-500 mt-1">Specific Tasks & Assignments</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-stone-600">
+              {tasks.filter((t) => t.status === "pending").length} pending
+            </p>
+            <Button size="sm" className="gap-1.5" onClick={() => {
+              setEditingTask(null)
+              setShowTaskModal(true)
+            }}>
+              <span>Add Task</span>
+            </Button>
+          </div>
+        </div>
+
+        {tasks.length === 0 ? (
+          <div className="bg-white p-8 rounded-xl border border-stone-200/60 text-center">
+            <p className="text-sm text-stone-500">No tasks yet. Create one to get started.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onComplete={handleCompleteTask}
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       <PowerMoveModal
         open={showPowerMoveModal}
         onOpenChange={setShowPowerMoveModal}
         onSave={handleSavePowerMove}
         victoryTargets={victoryTargets}
+      />
+
+      <TaskModal
+        open={showTaskModal}
+        onOpenChange={(open) => {
+          setShowTaskModal(open)
+          if (!open) setEditingTask(null)
+        }}
+        onSave={handleSaveTask}
+        initialTask={editingTask}
       />
     </section>
   )

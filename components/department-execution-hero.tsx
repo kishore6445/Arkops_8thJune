@@ -12,6 +12,9 @@ import { ExecutionStreak } from '@/components/execution-streak'
 import { QuarterSelector, type QuarterOption } from '@/components/quarter-selector'
 import { AccountabilitySections } from '@/components/accountability-sections'
 import { PowerMoveCardRedesigned } from '@/components/power-move-card-redesigned'
+import { TaskCardDepartment } from '@/components/task-card-department'
+import { TaskModal } from '@/components/task-modal'
+import { useTasks } from '@/lib/use-tasks'
 import {
   Flame,
   Target,
@@ -81,6 +84,10 @@ export function DepartmentExecutionHero({
 }: DepartmentExecutionHeroProps) {
   const { brandConfig, isReady } = useBrand()
   const [showStreak, setShowStreak] = useState(false)
+  
+  // Tasks state
+  const { tasks, addTask, completeTask, deleteTask } = useTasks()
+  const [showTaskModal, setShowTaskModal] = useState(false)
 
   const companyWIG = brandConfig?.companyWIG
 
@@ -699,6 +706,38 @@ export function DepartmentExecutionHero({
           </div>
         )}
       </div>
+
+      {/* TASKS */}
+      <div className='space-y-4'>
+        <div className='flex items-center justify-between mb-4'>
+          <p className='text-lg font-black uppercase tracking-wide text-stone-900'>Tasks</p>
+          <Button size='sm' onClick={() => setShowTaskModal(true)}>
+            Add Task
+          </Button>
+        </div>
+
+        {tasks.length === 0 ? (
+          <div className='bg-white p-8 rounded-xl border border-stone-200/60 text-center'>
+            <p className='text-sm text-stone-500'>No tasks yet for this department.</p>
+          </div>
+        ) : (
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+            {tasks.map((task) => (
+              <TaskCardDepartment
+                key={task.id}
+                task={task}
+                onComplete={completeTask}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <TaskModal
+        open={showTaskModal}
+        onOpenChange={setShowTaskModal}
+        onSave={addTask}
+      />
     </div>
   )
 }
